@@ -99,8 +99,8 @@ const tacticsPositions = {
 
 const tacticMenus = [
     { id: 'CK', name: 'コーナーキック (CK)' },
-    { id: 'KI-own', name: '自陣キックイン' },
-    { id: 'KI-opp', name: '敵陣キックイン' },
+    { id: 'KI-own', name: '自陣スローイン' },
+    { id: 'KI-opp', name: '敵陣スローイン' },
     { id: 'PowerPlay', name: 'パワープレー' },
     { id: '4-3-3', name: '4-3-3 (定位置)' },
     { id: '3-5-2', name: '3-5-2 (定位置)' }
