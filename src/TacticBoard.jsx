@@ -107,27 +107,34 @@ const tacticMenus = [
 ];
 
 export default function TacticBoard() {
-    const [items, setItems] = useState(baseItems);
+    const [items, setItems] = useState(() => baseItems.map(item => ({
+        ...item,
+        angle: item.team === 'A' ? 90 : item.team === 'B' ? -90 : 0
+    })));
     const [draggingId, setDraggingId] = useState(null);
     const svgRef = useRef(null);
+    const hasMovedRef = useRef(false);
 
     const handleTacticClick = (tacticKey) => {
         const config = tacticsPositions[tacticKey];
         if (!config) return;
-        setItems(items.map(item => ({
+        setItems(prevItems => prevItems.map(item => ({
             ...item,
             x: config[item.id]?.x ?? item.x,
             y: config[item.id]?.y ?? item.y,
+            angle: item.team === 'A' ? 90 : item.team === 'B' ? -90 : 0
         })));
     };
 
     const handlePointerDown = (e, id) => {
         e.target.setPointerCapture(e.pointerId);
         setDraggingId(id);
+        hasMovedRef.current = false;
     };
 
     const handlePointerMove = useCallback((e) => {
         if (!draggingId || !svgRef.current) return;
+        hasMovedRef.current = true;
         const svg = svgRef.current;
         const CTM = svg.getScreenCTM();
         if (!CTM) return;
@@ -141,6 +148,24 @@ export default function TacticBoard() {
             e.target.releasePointerCapture(e.pointerId);
             setDraggingId(null);
         }
+    };
+
+    const handleClick = (e, id) => {
+        if (hasMovedRef.current) return;
+        if (id === 'ball') return;
+        setItems(prev => prev.map(item =>
+            item.id === id ? { ...item, angle: (item.angle || 0) + 45 } : item
+        ));
+    };
+
+    const handleWheel = (e, id) => {
+        if (id === 'ball') return;
+        // prevent page scrolling if possible
+        e.stopPropagation();
+        const delta = e.deltaY > 0 ? 15 : -15;
+        setItems(prev => prev.map(item =>
+            item.id === id ? { ...item, angle: (item.angle || 0) + delta } : item
+        ));
     };
 
     return (
@@ -190,13 +215,26 @@ export default function TacticBoard() {
                                     key={item.id}
                                     transform={`translate(${item.x}, ${item.y})`}
                                     onPointerDown={(e) => handlePointerDown(e, item.id)}
+                                    onClick={(e) => handleClick(e, item.id)}
+                                    onWheel={(e) => handleWheel(e, item.id)}
                                     style={{
                                         transition: isDragging ? 'none' : 'transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1)',
                                         cursor: isDragging ? 'grabbing' : 'grab',
                                     }}
                                     className={isDragging ? 'opacity-80 drop-shadow-lg' : 'drop-shadow-md hover:opacity-90'}
                                 >
-                                    <circle cx="0" cy="0" r={r} fill={item.color} stroke="#1E293B" strokeWidth={item.id === 'ball' ? 1 : 2} />
+                                    <g transform={`rotate(${item.angle || 0})`} style={{ transition: isDragging ? 'none' : 'transform 0.2s ease' }}>
+                                        <circle cx="0" cy="0" r={r} fill={item.color} stroke="#1E293B" strokeWidth={item.id === 'ball' ? 1 : 2} />
+                                        {item.id !== 'ball' && (
+                                            <polygon
+                                                points={`0,-${Math.max(r + 8, 26)} -6,-${r} 6,-${r}`}
+                                                fill={item.color}
+                                                stroke="#1E293B"
+                                                strokeWidth="2"
+                                                strokeLinejoin="round"
+                                            />
+                                        )}
+                                    </g>
                                     {item.id !== 'ball' && (
                                         <text
                                             x="0" y="0"
