@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback } from 'react';
-import { Undo2, MousePointer2, Pencil, Trash2 } from 'lucide-react';
+import { Undo2, MousePointer2, Pencil, Trash2, ArrowLeftRight } from 'lucide-react';
 
 const SVG_W = 1000;
 const SVG_H = 600;
@@ -119,16 +119,44 @@ export default function TacticBoard() {
     const [lines, setLines] = useState([]);
     const [currentLine, setCurrentLine] = useState('');
     const [isDrawing, setIsDrawing] = useState(false);
+    const [isSecondHalf, setIsSecondHalf] = useState(false);
 
     const handleTacticClick = (tacticKey) => {
         const config = tacticsPositions[tacticKey];
         if (!config) return;
         setItems(prevItems => prevItems.map(item => ({
             ...item,
-            x: config[item.id]?.x ?? item.x,
-            y: config[item.id]?.y ?? item.y,
-            angle: item.team === 'A' ? 90 : item.team === 'B' ? -90 : 0
+            x: isSecondHalf ? SVG_W - (config[item.id]?.x ?? item.x) : config[item.id]?.x ?? item.x,
+            y: isSecondHalf ? SVG_H - (config[item.id]?.y ?? item.y) : config[item.id]?.y ?? item.y,
+            angle: isSecondHalf ? (item.team === 'A' ? -90 : item.team === 'B' ? 90 : 0) : (item.team === 'A' ? 90 : item.team === 'B' ? -90 : 0)
         })));
+    };
+
+    const handleHalfToggle = () => {
+        setIsSecondHalf(prev => !prev);
+
+        // アイテムの座標と角度を反転
+        setItems(prev => prev.map(item => ({
+            ...item,
+            x: SVG_W - item.x,
+            y: SVG_H - item.y,
+            angle: (item.angle || 0) + 180
+        })));
+
+        // 描画されたポインティング線も反転
+        const flipLine = (lineStr) => {
+            if (!lineStr) return '';
+            return lineStr.split(' ').map(point => {
+                const [px, py] = point.split(',').map(Number);
+                if (isNaN(px) || isNaN(py)) return point;
+                return `${SVG_W - px},${SVG_H - py}`;
+            }).join(' ');
+        };
+
+        setLines(prev => prev.map(flipLine));
+        if (currentLine) {
+            setCurrentLine(flipLine(currentLine));
+        }
     };
 
     const handlePointerDown = (e, id) => {
@@ -308,6 +336,26 @@ export default function TacticBoard() {
 
             {/* サイドバー: 戦術メニュー */}
             <div className="w-full lg:w-72 flex flex-col gap-4 mt-8 lg:mt-0">
+                <div className="bg-white p-5 rounded-xl shadow-md border border-slate-200">
+                    <h2 className="text-lg font-bold mb-4 border-b pb-2 flex items-center justify-between">
+                        ハーフ選択
+                    </h2>
+                    <div className="flex bg-slate-100 p-1 rounded-lg">
+                        <button
+                            onClick={() => { if (isSecondHalf) handleHalfToggle(); }}
+                            className={`flex-1 py-2 rounded-md font-bold transition-all text-sm ${!isSecondHalf ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                        >
+                            前半
+                        </button>
+                        <button
+                            onClick={() => { if (!isSecondHalf) handleHalfToggle(); }}
+                            className={`flex-1 py-2 rounded-md font-bold transition-all text-sm ${isSecondHalf ? 'bg-white text-red-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                        >
+                            後半
+                        </button>
+                    </div>
+                </div>
+
                 <div className="bg-white p-5 rounded-xl shadow-md border border-slate-200">
                     <h2 className="text-lg font-bold mb-4 border-b pb-2">ツールモード</h2>
                     <div className="flex gap-2 mb-4">
