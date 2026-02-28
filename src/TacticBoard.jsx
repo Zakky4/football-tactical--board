@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback } from 'react';
-import { Undo2, MousePointer2 } from 'lucide-react';
+import { Undo2, MousePointer2, Pencil, Trash2 } from 'lucide-react';
 
 const SVG_W = 1000;
 const SVG_H = 600;
@@ -115,6 +115,11 @@ export default function TacticBoard() {
     const svgRef = useRef(null);
     const hasMovedRef = useRef(false);
 
+    const [isPenMode, setIsPenMode] = useState(false);
+    const [lines, setLines] = useState([]);
+    const [currentLine, setCurrentLine] = useState('');
+    const [isDrawing, setIsDrawing] = useState(false);
+
     const handleTacticClick = (tacticKey) => {
         const config = tacticsPositions[tacticKey];
         if (!config) return;
@@ -127,23 +132,53 @@ export default function TacticBoard() {
     };
 
     const handlePointerDown = (e, id) => {
+        if (isPenMode) return;
         e.target.setPointerCapture(e.pointerId);
         setDraggingId(id);
         hasMovedRef.current = false;
     };
 
-    const handlePointerMove = useCallback((e) => {
-        if (!draggingId || !svgRef.current) return;
-        hasMovedRef.current = true;
+    const handleSvgPointerDown = (e) => {
+        if (!isPenMode) return;
+        e.target.setPointerCapture(e.pointerId);
+        setIsDrawing(true);
         const svg = svgRef.current;
         const CTM = svg.getScreenCTM();
         if (!CTM) return;
         const x = (e.clientX - CTM.e) / CTM.a;
         const y = (e.clientY - CTM.f) / CTM.d;
+        setCurrentLine(`${x},${y}`);
+    };
+
+    const handlePointerMove = useCallback((e) => {
+        if (!svgRef.current) return;
+        const svg = svgRef.current;
+        const CTM = svg.getScreenCTM();
+        if (!CTM) return;
+        const x = (e.clientX - CTM.e) / CTM.a;
+        const y = (e.clientY - CTM.f) / CTM.d;
+
+        if (isPenMode && isDrawing) {
+            setCurrentLine(prev => `${prev} ${x},${y}`);
+            return;
+        }
+
+        if (!draggingId) return;
+        hasMovedRef.current = true;
         setItems(prev => prev.map(item => item.id === draggingId ? { ...item, x, y } : item));
-    }, [draggingId]);
+    }, [draggingId, isPenMode, isDrawing]);
 
     const handlePointerUp = (e) => {
+        if (isPenMode && isDrawing) {
+            e.target.releasePointerCapture(e.pointerId);
+            setIsDrawing(false);
+            if (currentLine) {
+                setLines(prev => [...prev, currentLine]);
+                setCurrentLine('');
+            }
+            return;
+        }
+
         if (draggingId) {
             e.target.releasePointerCapture(e.pointerId);
             setDraggingId(null);
@@ -151,6 +186,7 @@ export default function TacticBoard() {
     };
 
     const handleClick = (e, id) => {
+        if (isPenMode) return;
         if (hasMovedRef.current) return;
         if (id === 'ball') return;
         setItems(prev => prev.map(item =>
@@ -159,6 +195,7 @@ export default function TacticBoard() {
     };
 
     const handleWheel = (e, id) => {
+        if (isPenMode) return;
         if (id === 'ball') return;
         // prevent page scrolling if possible
         e.stopPropagation();
@@ -180,7 +217,8 @@ export default function TacticBoard() {
                     <svg
                         ref={svgRef}
                         viewBox={`0 0 ${SVG_W} ${SVG_H}`}
-                        className="w-full h-auto cursor-crosshair touch-none select-none"
+                        className={`w-full h-auto touch-none select-none ${isPenMode ? 'cursor-crosshair' : 'cursor-default'}`}
+                        onPointerDown={handleSvgPointerDown}
                         onPointerMove={handlePointerMove}
                         onPointerUp={handlePointerUp}
                         onPointerLeave={handlePointerUp}
@@ -204,6 +242,14 @@ export default function TacticBoard() {
                         {/* PKマーク */}
                         <circle cx={PADDING + 110} cy={SVG_H / 2} r="3" fill={COLORS.line} />
                         <circle cx={SVG_W - PADDING - 110} cy={SVG_H / 2} r="3" fill={COLORS.line} />
+
+                        {/* 描画された線 */}
+                        {lines.map((points, index) => (
+                            <polyline key={index} points={points} fill="none" stroke="#EF4444" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" pointerEvents="none" />
+                        ))}
+                        {currentLine && (
+                            <polyline points={currentLine} fill="none" stroke="#EF4444" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" pointerEvents="none" />
+                        )}
 
                         {/* プレイヤー＆ボール */}
                         {items.map(item => {
@@ -262,6 +308,33 @@ export default function TacticBoard() {
 
             {/* サイドバー: 戦術メニュー */}
             <div className="w-full lg:w-72 flex flex-col gap-4 mt-8 lg:mt-0">
+                <div className="bg-white p-5 rounded-xl shadow-md border border-slate-200">
+                    <h2 className="text-lg font-bold mb-4 border-b pb-2">ツールモード</h2>
+                    <div className="flex gap-2 mb-4">
+                        <button
+                            onClick={() => setIsPenMode(false)}
+                            className={`flex-1 flex flex-col items-center justify-center p-3 rounded-lg font-bold transition-colors ${!isPenMode ? 'bg-blue-600 text-white shadow-inner' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                        >
+                            <MousePointer2 className="w-6 h-6 mb-1" />
+                            操作
+                        </button>
+                        <button
+                            onClick={() => setIsPenMode(true)}
+                            className={`flex-1 flex flex-col items-center justify-center p-3 rounded-lg font-bold transition-colors ${isPenMode ? 'bg-red-500 text-white shadow-inner' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                        >
+                            <Pencil className="w-6 h-6 mb-1" />
+                            ペン
+                        </button>
+                    </div>
+                    <button
+                        onClick={() => { setLines([]); setCurrentLine(''); }}
+                        className="flex items-center justify-center gap-2 w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-colors font-bold border border-slate-300"
+                    >
+                        <Trash2 className="w-5 h-5" />
+                        描画クリア
+                    </button>
+                </div>
+
                 <div className="bg-white p-5 rounded-xl shadow-md border border-slate-200">
                     <h2 className="text-lg font-bold mb-4 border-b pb-2">戦術メニュー</h2>
                     <div className="flex flex-col gap-3">
