@@ -1,5 +1,5 @@
-import React, { useState, useRef, useCallback } from 'react';
-import { Undo2, MousePointer2, Pencil, Trash2, ArrowLeftRight, Users, X } from 'lucide-react';
+import React, { useState, useRef, useCallback, memo } from 'react';
+import { Undo2, MousePointer2, Pencil, Trash2, Users, X } from 'lucide-react';
 
 const SVG_W = 1000;
 const SVG_H = 600;
@@ -106,6 +106,136 @@ const tacticMenus = [
     { id: '3-5-2', name: '3-5-2 (定位置)' }
 ];
 
+// --- Sub-components ---
+
+const Field = memo(() => (
+    <>
+        <rect width="100%" height="100%" fill="#4ADE80" />
+        <rect x={PADDING} y={PADDING} width={COURT_W} height={COURT_H} fill={COLORS.bg} stroke={COLORS.line} strokeWidth="2" />
+        <line x1={SVG_W / 2} y1={PADDING} x2={SVG_W / 2} y2={SVG_H - PADDING} stroke={COLORS.line} strokeWidth="2" />
+        <circle cx={SVG_W / 2} cy={SVG_H / 2} r="90" fill="none" stroke={COLORS.line} strokeWidth="2" />
+        <circle cx={SVG_W / 2} cy={SVG_H / 2} r="4" fill={COLORS.line} />
+        {/* ペナルティエリア A */}
+        <rect x={PADDING} y={SVG_H / 2 - 120} width="165" height="240" fill="none" stroke={COLORS.line} strokeWidth="2" />
+        {/* ペナルティエリア B */}
+        <rect x={SVG_W - PADDING - 165} y={SVG_H / 2 - 120} width="165" height="240" fill="none" stroke={COLORS.line} strokeWidth="2" />
+        {/* ゴールエリア A */}
+        <rect x={PADDING} y={SVG_H / 2 - 50} width="55" height="100" fill="none" stroke={COLORS.line} strokeWidth="2" />
+        {/* ゴールエリア B */}
+        <rect x={SVG_W - PADDING - 55} y={SVG_H / 2 - 50} width="55" height="100" fill="none" stroke={COLORS.line} strokeWidth="2" />
+        {/* PKマーク */}
+        <circle cx={PADDING + 110} cy={SVG_H / 2} r="3" fill={COLORS.line} />
+        <circle cx={SVG_W - PADDING - 110} cy={SVG_H / 2} r="3" fill={COLORS.line} />
+    </>
+));
+
+const Piece = memo(({ item, onPointerDown, onClick, onDoubleClick, onWheel, isDragging }) => {
+    const r = item.radius || 18;
+    return (
+        <g
+            transform={`translate(${item.x}, ${item.y})`}
+            onPointerDown={(e) => onPointerDown(e, item.id)}
+            onClick={(e) => onClick(e, item.id)}
+            onDoubleClick={(e) => onDoubleClick(e, item)}
+            onWheel={(e) => onWheel(e, item.id)}
+            style={{
+                transition: isDragging ? 'none' : 'transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1)',
+                cursor: isDragging ? 'grabbing' : 'grab',
+            }}
+            className={isDragging ? 'opacity-80 drop-shadow-lg' : 'drop-shadow-md hover:opacity-90'}
+        >
+            <g transform={`rotate(${item.angle || 0})`} style={{ transition: isDragging ? 'none' : 'transform 0.2s ease' }}>
+                <circle cx="0" cy="0" r={r} fill={item.color} stroke="#1E293B" strokeWidth={item.id === 'ball' ? 1 : 2} />
+                {item.id !== 'ball' && (
+                    <polygon
+                        points={`0,-${Math.max(r + 8, 26)} -6,-${r} 6,-${r}`}
+                        fill={item.color}
+                        stroke="#1E293B"
+                        strokeWidth="2"
+                        strokeLinejoin="round"
+                    />
+                )}
+            </g>
+            {item.id !== 'ball' ? (
+                <>
+                    <text
+                        x="0" y="0"
+                        textAnchor="middle"
+                        dy="0.35em"
+                        fill="#FFFFFF"
+                        fontSize={item.label === 'GK' ? '12' : '16'}
+                        fontWeight="bold"
+                        pointerEvents="none"
+                    >
+                        {item.label}
+                    </text>
+                    <text
+                        x="0" y={r + 14}
+                        textAnchor="middle"
+                        fill="#1E293B"
+                        fontSize="12"
+                        fontWeight="600"
+                        pointerEvents="none"
+                        className="select-none"
+                        style={{ textShadow: '1px 1px 0px rgba(255,255,255,0.8), -1px -1px 0px rgba(255,255,255,0.8), 1px -1px 0px rgba(255,255,255,0.8), -1px 1px 0px rgba(255,255,255,0.8)' }}
+                    >
+                        {item.name}
+                    </text>
+                </>
+            ) : (
+                <text x="0" y="0" textAnchor="middle" dy="0.35em" fontSize="16" pointerEvents="none">
+                    {item.label}
+                </text>
+            )}
+        </g>
+    );
+});
+
+const EditingPopup = memo(({ editTarget, editForm, onFormChange, onFormSubmit, onClose }) => {
+    if (!editTarget) return null;
+    return (
+        <div
+            className="fixed bg-white p-3 rounded-lg shadow-xl border border-slate-200 z-50 flex flex-col gap-2 transform -translate-x-1/2 mt-4"
+            style={{ left: editTarget.x, top: editTarget.y }}
+        >
+            <div className="flex justify-between items-center mb-1">
+                <span className="text-xs font-bold text-slate-500">選手情報編集</span>
+                <button onClick={onClose} className="text-slate-400 hover:text-slate-700">
+                    <X className="w-4 h-4" />
+                </button>
+            </div>
+            <form onSubmit={onFormSubmit} className="flex flex-col gap-2">
+                <div className="flex items-center gap-2">
+                    <label className="text-sm font-semibold w-12 text-right">背番号</label>
+                    <input
+                        type="text"
+                        value={editForm.label}
+                        onChange={(e) => onFormChange(e, 'label')}
+                        className="w-16 px-2 py-1 text-sm border border-slate-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="No."
+                    />
+                </div>
+                <div className="flex items-center gap-2">
+                    <label className="text-sm font-semibold w-12 text-right">名前</label>
+                    <input
+                        type="text"
+                        value={editForm.name}
+                        onChange={(e) => onFormChange(e, 'name')}
+                        className="w-24 px-2 py-1 text-sm border border-slate-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="名前"
+                        autoFocus
+                    />
+                </div>
+                <button type="submit" className="mt-1 w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-1.5 px-2 rounded text-sm transition-colors">
+                    保存
+                </button>
+            </form>
+        </div>
+    );
+});
+
+// --- Main component ---
+
 export default function TacticBoard() {
     const [items, setItems] = useState(() => baseItems.map(item => ({
         ...item,
@@ -125,7 +255,7 @@ export default function TacticBoard() {
     const [editForm, setEditForm] = useState({ label: '', name: '' });
     const [showPlayerList, setShowPlayerList] = useState(false);
 
-    const handleTacticClick = (tacticKey) => {
+    const handleTacticClick = useCallback((tacticKey) => {
         const config = tacticsPositions[tacticKey];
         if (!config) return;
         setItems(prevItems => prevItems.map(item => ({
@@ -134,12 +264,10 @@ export default function TacticBoard() {
             y: isSecondHalf ? SVG_H - (config[item.id]?.y ?? item.y) : config[item.id]?.y ?? item.y,
             angle: isSecondHalf ? (item.team === 'A' ? -90 : item.team === 'B' ? 90 : 0) : (item.team === 'A' ? 90 : item.team === 'B' ? -90 : 0)
         })));
-    };
+    }, [isSecondHalf]);
 
-    const handleHalfToggle = () => {
+    const handleHalfToggle = useCallback(() => {
         setIsSecondHalf(prev => !prev);
-
-        // アイテムの座標と角度を反転
         setItems(prev => prev.map(item => ({
             ...item,
             x: SVG_W - item.x,
@@ -147,7 +275,6 @@ export default function TacticBoard() {
             angle: (item.angle || 0) + 180
         })));
 
-        // 描画されたポインティング線も反転
         const flipLine = (lineStr) => {
             if (!lineStr) return '';
             return lineStr.split(' ').map(point => {
@@ -158,34 +285,33 @@ export default function TacticBoard() {
         };
 
         setLines(prev => prev.map(flipLine));
-        if (currentLine) {
-            setCurrentLine(flipLine(currentLine));
-        }
-    };
+        setCurrentLine(prev => flipLine(prev));
+    }, []);
 
-    const handlePointerDown = (e, id) => {
+    const handlePointerDown = useCallback((e, id) => {
         if (isPenMode) return;
         e.target.setPointerCapture(e.pointerId);
         setDraggingId(id);
         hasMovedRef.current = false;
-        if (editTarget && editTarget.id !== id) setEditTarget(null); // 他を選ぶと編集解除
-    };
+        setEditTarget(null); // 他を選ぶと編集解除
+    }, [isPenMode]);
 
-    const handleSvgPointerDown = (e) => {
+    const handleSvgPointerDown = useCallback((e) => {
         if (!isPenMode) return;
         e.target.setPointerCapture(e.pointerId);
         setIsDrawing(true);
         const svg = svgRef.current;
+        if (!svg) return;
         const CTM = svg.getScreenCTM();
         if (!CTM) return;
         const x = (e.clientX - CTM.e) / CTM.a;
         const y = (e.clientY - CTM.f) / CTM.d;
         setCurrentLine(`${x},${y}`);
-    };
+    }, [isPenMode]);
 
     const handlePointerMove = useCallback((e) => {
-        if (!svgRef.current) return;
         const svg = svgRef.current;
+        if (!svg) return;
         const CTM = svg.getScreenCTM();
         if (!CTM) return;
         const x = (e.clientX - CTM.e) / CTM.a;
@@ -196,12 +322,13 @@ export default function TacticBoard() {
             return;
         }
 
-        if (!draggingId) return;
-        hasMovedRef.current = true;
-        setItems(prev => prev.map(item => item.id === draggingId ? { ...item, x, y } : item));
+        if (draggingId) {
+            hasMovedRef.current = true;
+            setItems(prev => prev.map(item => item.id === draggingId ? { ...item, x, y } : item));
+        }
     }, [draggingId, isPenMode, isDrawing]);
 
-    const handlePointerUp = (e) => {
+    const handlePointerUp = useCallback((e) => {
         if (isPenMode && isDrawing) {
             e.target.releasePointerCapture(e.pointerId);
             setIsDrawing(false);
@@ -215,42 +342,23 @@ export default function TacticBoard() {
         if (draggingId) {
             e.target.releasePointerCapture(e.pointerId);
             setDraggingId(null);
-
-            // ドラッグ完了時に編集ポップアップの位置を更新する（開いていた場合）
-            if (editTarget && editTarget.id === draggingId) {
-                const targetItem = items.find(item => item.id === draggingId);
-                const svg = svgRef.current;
-                if (targetItem && svg) {
-                    const pt = svg.createSVGPoint();
-                    pt.x = targetItem.x;
-                    pt.y = targetItem.y;
-                    const CTM = svg.getScreenCTM();
-                    if (CTM) {
-                        const screenPt = pt.matrixTransform(CTM);
-                        setEditTarget(prev => ({ ...prev, x: screenPt.x, y: screenPt.y }));
-                    }
-                }
-            }
         }
-    };
+    }, [draggingId, isPenMode, isDrawing, currentLine]);
 
-    const handleClick = (e, id) => {
-        if (isPenMode) return;
-        if (hasMovedRef.current) return;
-        if (id === 'ball') return;
+    const handleClick = useCallback((e, id) => {
+        if (isPenMode || hasMovedRef.current || id === 'ball') return;
         setItems(prev => prev.map(item =>
             item.id === id ? { ...item, angle: (item.angle || 0) + 45 } : item
         ));
-    };
+    }, [isPenMode]);
 
-    const handleDoubleClick = (e, targetItem) => {
+    const handleDoubleClick = useCallback((e, targetItem) => {
         if (isPenMode || targetItem.id === 'ball') return;
         e.stopPropagation();
 
         const svg = svgRef.current;
         if (!svg) return;
 
-        // SVG座標系からスクリーン座標系へ変換
         const pt = svg.createSVGPoint();
         pt.x = targetItem.x;
         pt.y = targetItem.y;
@@ -258,24 +366,18 @@ export default function TacticBoard() {
         if (!CTM) return;
 
         const screenPt = pt.matrixTransform(CTM);
-
         setEditTarget({ id: targetItem.id, x: screenPt.x, y: screenPt.y });
         setEditForm({ label: targetItem.label, name: targetItem.name });
-    };
+    }, [isPenMode]);
 
-    const handleEditFormChange = (e, field) => {
+    const handleEditFormChange = useCallback((e, field) => {
         let val = e.target.value;
-        if (field === 'label') {
-            // 背番号は数値＋GK等（最大3文字制限）
-            if (val.length > 3) return;
-        } else if (field === 'name') {
-            // 名前は最大10文字程度
-            if (val.length > 10) return;
-        }
+        if (field === 'label' && val.length > 3) return;
+        if (field === 'name' && val.length > 10) return;
         setEditForm(prev => ({ ...prev, [field]: val }));
-    };
+    }, []);
 
-    const handleEditFormSubmit = (e) => {
+    const handleEditFormSubmit = useCallback((e) => {
         e.preventDefault();
         if (editTarget) {
             setItems(prev => prev.map(item =>
@@ -283,27 +385,24 @@ export default function TacticBoard() {
             ));
             setEditTarget(null);
         }
-    };
+    }, [editTarget, editForm]);
 
-    const handleItemChange = (id, field, value) => {
-        let val = value;
-        if (field === 'label' && val.length > 3) return;
-        if (field === 'name' && val.length > 10) return;
+    const handleItemChange = useCallback((id, field, value) => {
+        if (field === 'label' && value.length > 3) return;
+        if (field === 'name' && value.length > 10) return;
         setItems(prev => prev.map(item =>
-            item.id === id ? { ...item, [field]: val } : item
+            item.id === id ? { ...item, [field]: value } : item
         ));
-    };
+    }, []);
 
-    const handleWheel = (e, id) => {
-        if (isPenMode) return;
-        if (id === 'ball') return;
-        // prevent page scrolling if possible
+    const handleWheel = useCallback((e, id) => {
+        if (isPenMode || id === 'ball') return;
         e.stopPropagation();
         const delta = e.deltaY > 0 ? 15 : -15;
         setItems(prev => prev.map(item =>
             item.id === id ? { ...item, angle: (item.angle || 0) + delta } : item
         ));
-    };
+    }, [isPenMode]);
 
     return (
         <div className="flex flex-col lg:flex-row min-h-screen bg-slate-50 text-slate-800 p-4 font-sans max-w-7xl mx-auto">
@@ -313,7 +412,7 @@ export default function TacticBoard() {
                     Tactical Board
                 </h1>
 
-                <div className="w-full max-w-5xl shadow-xl rounded-lg overflow-hidden border-4 border-slate-300 bg-white">
+                <div className="w-full max-w-5xl shadow-xl rounded-lg overflow-hidden border-4 border-slate-300 bg-white relative">
                     <svg
                         ref={svgRef}
                         viewBox={`0 0 ${SVG_W} ${SVG_H}`}
@@ -323,26 +422,7 @@ export default function TacticBoard() {
                         onPointerUp={handlePointerUp}
                         onPointerLeave={handlePointerUp}
                     >
-                        <rect width="100%" height="100%" fill="#4ADE80" />
-                        <rect x={PADDING} y={PADDING} width={COURT_W} height={COURT_H} fill={COLORS.bg} stroke={COLORS.line} strokeWidth="2" />
-                        <line x1={SVG_W / 2} y1={PADDING} x2={SVG_W / 2} y2={SVG_H - PADDING} stroke={COLORS.line} strokeWidth="2" />
-                        <circle cx={SVG_W / 2} cy={SVG_H / 2} r="90" fill="none" stroke={COLORS.line} strokeWidth="2" />
-                        <circle cx={SVG_W / 2} cy={SVG_H / 2} r="4" fill={COLORS.line} />
-
-                        {/* ペナルティエリア A */}
-                        <rect x={PADDING} y={SVG_H / 2 - 120} width="165" height="240" fill="none" stroke={COLORS.line} strokeWidth="2" />
-                        {/* ペナルティエリア B */}
-                        <rect x={SVG_W - PADDING - 165} y={SVG_H / 2 - 120} width="165" height="240" fill="none" stroke={COLORS.line} strokeWidth="2" />
-
-                        {/* ゴールエリア A */}
-                        <rect x={PADDING} y={SVG_H / 2 - 50} width="55" height="100" fill="none" stroke={COLORS.line} strokeWidth="2" />
-                        {/* ゴールエリア B */}
-                        <rect x={SVG_W - PADDING - 55} y={SVG_H / 2 - 50} width="55" height="100" fill="none" stroke={COLORS.line} strokeWidth="2" />
-
-                        {/* PKマーク */}
-                        <circle cx={PADDING + 110} cy={SVG_H / 2} r="3" fill={COLORS.line} />
-                        <circle cx={SVG_W - PADDING - 110} cy={SVG_H / 2} r="3" fill={COLORS.line} />
-
+                        <Field />
                         {/* 描画された線 */}
                         {lines.map((points, index) => (
                             <polyline key={index} points={points} fill="none" stroke="#EF4444" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" pointerEvents="none" />
@@ -352,131 +432,42 @@ export default function TacticBoard() {
                         )}
 
                         {/* プレイヤー＆ボール */}
-                        {items.map(item => {
-                            const r = item.radius || 18;
-                            const isDragging = draggingId === item.id;
-
-                            return (
-                                <g
-                                    key={item.id}
-                                    transform={`translate(${item.x}, ${item.y})`}
-                                    onPointerDown={(e) => handlePointerDown(e, item.id)}
-                                    onClick={(e) => handleClick(e, item.id)}
-                                    onDoubleClick={(e) => handleDoubleClick(e, item)}
-                                    onWheel={(e) => handleWheel(e, item.id)}
-                                    style={{
-                                        transition: isDragging ? 'none' : 'transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1)',
-                                        cursor: isDragging ? 'grabbing' : 'grab',
-                                    }}
-                                    className={isDragging ? 'opacity-80 drop-shadow-lg' : 'drop-shadow-md hover:opacity-90'}
-                                >
-                                    <g transform={`rotate(${item.angle || 0})`} style={{ transition: isDragging ? 'none' : 'transform 0.2s ease' }}>
-                                        <circle cx="0" cy="0" r={r} fill={item.color} stroke="#1E293B" strokeWidth={item.id === 'ball' ? 1 : 2} />
-                                        {item.id !== 'ball' && (
-                                            <polygon
-                                                points={`0,-${Math.max(r + 8, 26)} -6,-${r} 6,-${r}`}
-                                                fill={item.color}
-                                                stroke="#1E293B"
-                                                strokeWidth="2"
-                                                strokeLinejoin="round"
-                                            />
-                                        )}
-                                    </g>
-                                    {item.id !== 'ball' && (
-                                        <>
-                                            <text
-                                                x="0" y="0"
-                                                textAnchor="middle"
-                                                dy="0.35em"
-                                                fill="#FFFFFF"
-                                                fontSize={item.label === 'GK' ? '12' : '16'}
-                                                fontWeight="bold"
-                                                pointerEvents="none"
-                                            >
-                                                {item.label}
-                                            </text>
-                                            <text
-                                                x="0" y={r + 14}
-                                                textAnchor="middle"
-                                                fill="#1E293B"
-                                                fontSize="12"
-                                                fontWeight="600"
-                                                pointerEvents="none"
-                                                className="select-none"
-                                                style={{ textShadow: '1px 1px 0px rgba(255,255,255,0.8), -1px -1px 0px rgba(255,255,255,0.8), 1px -1px 0px rgba(255,255,255,0.8), -1px 1px 0px rgba(255,255,255,0.8)' }}
-                                            >
-                                                {item.name}
-                                            </text>
-                                        </>
-                                    )}
-                                    {item.id === 'ball' && (
-                                        <text x="0" y="0" textAnchor="middle" dy="0.35em" fontSize="16" pointerEvents="none">
-                                            {item.label}
-                                        </text>
-                                    )}
-                                </g>
-                            );
-                        })}
+                        {items.map(item => (
+                            <Piece
+                                key={item.id}
+                                item={item}
+                                onPointerDown={handlePointerDown}
+                                onClick={handleClick}
+                                onDoubleClick={handleDoubleClick}
+                                onWheel={handleWheel}
+                                isDragging={draggingId === item.id}
+                            />
+                        ))}
                     </svg>
 
-                    {/* 個別編集ポップアップ */}
-                    {editTarget && (
-                        <div
-                            className="fixed bg-white p-3 rounded-lg shadow-xl border border-slate-200 z-50 flex flex-col gap-2 transform -translate-x-1/2 mt-4"
-                            style={{ left: editTarget.x, top: editTarget.y }}
-                        >
-                            <div className="flex justify-between items-center mb-1">
-                                <span className="text-xs font-bold text-slate-500">選手情報編集</span>
-                                <button onClick={() => setEditTarget(null)} className="text-slate-400 hover:text-slate-700">
-                                    <X className="w-4 h-4" />
-                                </button>
-                            </div>
-                            <form onSubmit={handleEditFormSubmit} className="flex flex-col gap-2">
-                                <div className="flex items-center gap-2">
-                                    <label className="text-sm font-semibold w-12 text-right">背番号</label>
-                                    <input
-                                        type="text"
-                                        value={editForm.label}
-                                        onChange={(e) => handleEditFormChange(e, 'label')}
-                                        className="w-16 px-2 py-1 text-sm border border-slate-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                        placeholder="No."
-                                    />
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <label className="text-sm font-semibold w-12 text-right">名前</label>
-                                    <input
-                                        type="text"
-                                        value={editForm.name}
-                                        onChange={(e) => handleEditFormChange(e, 'name')}
-                                        className="w-24 px-2 py-1 text-sm border border-slate-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                        placeholder="名前"
-                                        autoFocus
-                                    />
-                                </div>
-                                <button type="submit" className="mt-1 w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-1.5 px-2 rounded text-sm transition-colors">
-                                    保存
-                                </button>
-                            </form>
-                        </div>
-                    )}
+                    <EditingPopup
+                        editTarget={editTarget}
+                        editForm={editForm}
+                        onFormChange={handleEditFormChange}
+                        onFormSubmit={handleEditFormSubmit}
+                        onClose={() => setEditTarget(null)}
+                    />
                 </div>
             </div>
 
-            {/* サイドバー: 戦術メニュー */}
+            {/* サイドバー */}
             <div className="w-full lg:w-72 flex flex-col gap-4 mt-8 lg:mt-0">
                 <div className="bg-white p-5 rounded-xl shadow-md border border-slate-200">
-                    <h2 className="text-lg font-bold mb-4 border-b pb-2 flex items-center justify-between">
-                        ハーフ選択
-                    </h2>
+                    <h2 className="text-lg font-bold mb-4 border-b pb-2 flex items-center justify-between">ハーフ選択</h2>
                     <div className="flex bg-slate-100 p-1 rounded-lg">
                         <button
-                            onClick={() => { if (isSecondHalf) handleHalfToggle(); }}
+                            onClick={() => isSecondHalf && handleHalfToggle()}
                             className={`flex-1 py-2 rounded-md font-bold transition-all text-sm ${!isSecondHalf ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                         >
                             前半
                         </button>
                         <button
-                            onClick={() => { if (!isSecondHalf) handleHalfToggle(); }}
+                            onClick={() => !isSecondHalf && handleHalfToggle()}
                             className={`flex-1 py-2 rounded-md font-bold transition-all text-sm ${isSecondHalf ? 'bg-white text-red-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                         >
                             後半
@@ -509,10 +500,9 @@ export default function TacticBoard() {
                         <Users className="w-5 h-5" />
                         選手リスト（一括編集）
                     </button>
-
                     <button
                         onClick={() => { setLines([]); setCurrentLine(''); }}
-                        className="flex items-center justify-center gap-2 w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-colors font-bold border border-slate-300"
+                        className="mt-2 flex items-center justify-center gap-2 w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-colors font-bold border border-slate-300"
                     >
                         <Trash2 className="w-5 h-5" />
                         描画クリア
@@ -535,7 +525,7 @@ export default function TacticBoard() {
                 </div>
 
                 <button
-                    onClick={() => handleTacticClick('4-3-3')} // リセットとして扱う
+                    onClick={() => handleTacticClick('4-3-3')}
                     className="flex items-center justify-center gap-2 w-full py-3 bg-red-500 hover:bg-red-600 text-white rounded-xl shadow-md transition-colors font-bold"
                 >
                     <Undo2 className="w-5 h-5" />
@@ -556,63 +546,47 @@ export default function TacticBoard() {
                         </button>
                     </div>
                     <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-6">
-                        {/* 自チーム */}
-                        <div>
-                            <h3 className="text-sm font-bold text-blue-700 border-b-2 border-blue-500 mb-3 pb-1">自チーム (青)</h3>
-                            <div className="flex flex-col gap-2">
-                                {items.filter(i => i.team === 'A').map(item => (
-                                    <div key={item.id} className="flex items-center gap-2 bg-slate-50 p-2 rounded border border-slate-100 hover:border-blue-200">
-                                        <div className="w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-                                            {item.label}
-                                        </div>
-                                        <input
-                                            type="text"
-                                            value={item.label}
-                                            onChange={(e) => handleItemChange(item.id, 'label', e.target.value)}
-                                            className="w-12 px-1 py-1 text-sm border border-slate-200 rounded text-center focus:ring-1 focus:ring-blue-500"
-                                            placeholder="No"
-                                        />
-                                        <input
-                                            type="text"
-                                            value={item.name}
-                                            onChange={(e) => handleItemChange(item.id, 'name', e.target.value)}
-                                            className="flex-1 px-2 py-1 text-sm border border-slate-200 rounded focus:ring-1 focus:ring-blue-500"
-                                            placeholder="選手名"
-                                        />
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                        {/* 相手チーム */}
-                        <div>
-                            <h3 className="text-sm font-bold text-red-700 border-b-2 border-red-500 mb-3 pb-1">相手チーム (赤)</h3>
-                            <div className="flex flex-col gap-2">
-                                {items.filter(i => i.team === 'B').map(item => (
-                                    <div key={item.id} className="flex items-center gap-2 bg-slate-50 p-2 rounded border border-slate-100 hover:border-red-200">
-                                        <div className="w-6 h-6 rounded-full bg-red-500 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-                                            {item.label}
-                                        </div>
-                                        <input
-                                            type="text"
-                                            value={item.label}
-                                            onChange={(e) => handleItemChange(item.id, 'label', e.target.value)}
-                                            className="w-12 px-1 py-1 text-sm border border-slate-200 rounded text-center focus:ring-1 focus:ring-red-500"
-                                            placeholder="No"
-                                        />
-                                        <input
-                                            type="text"
-                                            value={item.name}
-                                            onChange={(e) => handleItemChange(item.id, 'name', e.target.value)}
-                                            className="flex-1 px-2 py-1 text-sm border border-slate-200 rounded focus:ring-1 focus:ring-red-500"
-                                            placeholder="選手名"
-                                        />
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
+                        <TeamSection title="自チーム (青)" team="A" items={items} onItemChange={handleItemChange} accentColor="blue" />
+                        <TeamSection title="相手チーム (赤)" team="B" items={items} onItemChange={handleItemChange} accentColor="red" />
                     </div>
                 </div>
             )}
         </div>
     );
 }
+
+const TeamSection = memo(({ title, team, items, onItemChange, accentColor }) => {
+    const teamItems = items.filter(i => i.team === team);
+    const borderColorClass = accentColor === 'blue' ? 'border-blue-500' : 'border-red-500';
+    const textColorClass = accentColor === 'blue' ? 'text-blue-700' : 'text-red-700';
+    const bgColorClass = accentColor === 'blue' ? 'bg-blue-500' : 'bg-red-500';
+
+    return (
+        <div>
+            <h3 className={`text-sm font-bold ${textColorClass} border-b-2 ${borderColorClass} mb-3 pb-1`}>{title}</h3>
+            <div className="flex flex-col gap-2">
+                {teamItems.map(item => (
+                    <div key={item.id} className="flex items-center gap-2 bg-slate-50 p-2 rounded border border-slate-100">
+                        <div className={`w-6 h-6 rounded-full ${bgColorClass} flex items-center justify-center text-white text-xs font-bold flex-shrink-0`}>
+                            {item.label}
+                        </div>
+                        <input
+                            type="text"
+                            value={item.label}
+                            onChange={(e) => onItemChange(item.id, 'label', e.target.value)}
+                            className="w-12 px-1 py-1 text-sm border border-slate-200 rounded text-center"
+                            placeholder="No"
+                        />
+                        <input
+                            type="text"
+                            value={item.name}
+                            onChange={(e) => onItemChange(item.id, 'name', e.target.value)}
+                            className="flex-1 px-2 py-1 text-sm border border-slate-200 rounded"
+                            placeholder="選手名"
+                        />
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+});
