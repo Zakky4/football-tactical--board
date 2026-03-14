@@ -17,6 +17,25 @@ const COLORS = {
     ball: '#F8FAFC'     // ボール
 };
 
+const getTextColor = (hexColor) => {
+    const hex = hexColor.replace('#', '');
+    const r = parseInt(hex.substring(0, 2), 16);
+    const g = parseInt(hex.substring(2, 2), 16);
+    const b = parseInt(hex.substring(4, 2), 16);
+    const yiq = ((r * 299) + (g * 587) + (b * 114)) / 1000;
+    return yiq >= 128 ? '#000000' : '#FFFFFF';
+};
+
+const PRESET_COLORS = [
+    { label: '赤', hex: '#EF4444' },
+    { label: '青', hex: '#3B82F6' },
+    { label: '黄', hex: '#EAB308' },
+    { label: '白', hex: '#FFFFFF' },
+    { label: '黒', hex: '#1E293B' },
+    { label: '緑', hex: '#22C55E' },
+    { label: 'オレンジ', hex: '#F97316' },
+];
+
 // 初期配置 4-3-3
 const baseItems = [
     // Team A
@@ -131,6 +150,7 @@ const Field = memo(() => (
 
 const Piece = memo(({ item, onPointerDown, onClick, onDoubleClick, onWheel, isDragging }) => {
     const r = item.radius || 18;
+    const textColor = item.textColor || '#FFFFFF';
     return (
         <g
             transform={`translate(${item.x}, ${item.y})`}
@@ -162,7 +182,7 @@ const Piece = memo(({ item, onPointerDown, onClick, onDoubleClick, onWheel, isDr
                         x="0" y="0"
                         textAnchor="middle"
                         dy="0.35em"
-                        fill="#FFFFFF"
+                        fill={textColor}
                         fontSize={item.label === 'GK' ? '12' : '16'}
                         fontWeight="bold"
                         pointerEvents="none"
@@ -172,12 +192,12 @@ const Piece = memo(({ item, onPointerDown, onClick, onDoubleClick, onWheel, isDr
                     <text
                         x="0" y={r + 14}
                         textAnchor="middle"
-                        fill="#1E293B"
+                        fill={textColor}
                         fontSize="12"
                         fontWeight="600"
                         pointerEvents="none"
                         className="select-none"
-                        style={{ textShadow: '1px 1px 0px rgba(255,255,255,0.8), -1px -1px 0px rgba(255,255,255,0.8), 1px -1px 0px rgba(255,255,255,0.8), -1px 1px 0px rgba(255,255,255,0.8)' }}
+                        style={{ textShadow: textColor === '#FFFFFF' ? '1px 1px 0px rgba(0,0,0,0.8), -1px -1px 0px rgba(0,0,0,0.8), 1px -1px 0px rgba(0,0,0,0.8), -1px 1px 0px rgba(0,0,0,0.8)' : '1px 1px 0px rgba(255,255,255,0.8), -1px -1px 0px rgba(255,255,255,0.8), 1px -1px 0px rgba(255,255,255,0.8), -1px 1px 0px rgba(255,255,255,0.8)' }}
                     >
                         {item.name}
                     </text>
@@ -234,9 +254,100 @@ const EditingPopup = memo(({ editTarget, editForm, onFormChange, onFormSubmit, o
     );
 });
 
+const ColorSettings = memo(({ teamColors, setTeamColors }) => {
+    const [activeTarget, setActiveTarget] = useState('A');
+
+    const handleColorChange = (key, value) => {
+        setTeamColors(prev => ({ ...prev, [key]: value }));
+        setActiveTarget(key);
+    };
+
+    const applyPreset = (hex) => {
+        handleColorChange(activeTarget, hex);
+    };
+
+    const ColorRow = ({ label, targetKey }) => (
+        <div 
+            className={`flex items-center justify-between gap-2 p-2 rounded cursor-pointer border ${activeTarget === targetKey ? 'border-blue-400 bg-blue-50' : 'border-transparent hover:bg-slate-50'}`}
+            onClick={() => setActiveTarget(targetKey)}
+        >
+            <span className="text-sm font-semibold w-8">{label}</span>
+            <input
+                type="color"
+                value={teamColors[targetKey]}
+                onChange={(e) => handleColorChange(targetKey, e.target.value)}
+                className="w-8 h-8 p-0 border-0 rounded cursor-pointer shrink-0"
+                onClick={(e) => e.stopPropagation()}
+            />
+            <input
+                type="text"
+                value={teamColors[targetKey].toUpperCase()}
+                onChange={(e) => handleColorChange(targetKey, e.target.value.slice(0, 7))}
+                className="w-20 px-2 py-1 text-sm border border-slate-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 uppercase font-mono"
+                onClick={(e) => e.stopPropagation()}
+            />
+        </div>
+    );
+
+    const targets = {
+        A: '自チーム (FP)',
+        AGK: '自チーム (GK)',
+        B: '相手チーム (FP)',
+        BGK: '相手チーム (GK)'
+    };
+
+    return (
+        <div className="bg-white p-5 rounded-xl shadow-md border border-slate-200">
+            <div className="flex justify-between items-center border-b pb-2 mb-4">
+                <h2 className="text-lg font-bold">カラー設定</h2>
+                <a href="https://www.colordic.org/" target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline flex items-center gap-1">
+                    カラー参考
+                </a>
+            </div>
+
+            <div className="flex flex-col gap-3">
+                <div className="flex flex-col gap-1">
+                    <h3 className="text-xs font-bold text-slate-500 ml-1">自チーム</h3>
+                    <ColorRow label="FP" targetKey="A" />
+                    <ColorRow label="GK" targetKey="AGK" />
+                </div>
+                <div className="flex flex-col gap-1">
+                    <h3 className="text-xs font-bold text-slate-500 ml-1">相手チーム</h3>
+                    <ColorRow label="FP" targetKey="B" />
+                    <ColorRow label="GK" targetKey="BGK" />
+                </div>
+            </div>
+
+            <div className="mt-4 pt-4 border-t border-slate-100">
+                <div className="flex justify-between items-end mb-2">
+                    <h3 className="text-xs font-bold text-slate-500">プリセット</h3>
+                    <span className="text-[10px] text-slate-400">選択中: {targets[activeTarget]}</span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                    {PRESET_COLORS.map(c => (
+                        <button
+                            key={c.label}
+                            onClick={() => applyPreset(c.hex)}
+                            title={c.label}
+                            className="w-6 h-6 rounded-full border border-slate-300 shadow-sm hover:scale-110 transition-transform"
+                            style={{ backgroundColor: c.hex }}
+                        />
+                    ))}
+                </div>
+            </div>
+        </div>
+    );
+});
+
 // --- Main component ---
 
 export default function TacticBoard() {
+    const [teamColors, setTeamColors] = useState({
+        A: COLORS.teamA,
+        AGK: COLORS.teamAGK,
+        B: COLORS.teamB,
+        BGK: COLORS.teamBGK,
+    });
     const [items, setItems] = useState(() => baseItems.map(item => ({
         ...item,
         angle: item.team === 'A' ? 90 : item.team === 'B' ? -90 : 0
@@ -432,17 +543,26 @@ export default function TacticBoard() {
                         )}
 
                         {/* プレイヤー＆ボール */}
-                        {items.map(item => (
-                            <Piece
-                                key={item.id}
-                                item={item}
-                                onPointerDown={handlePointerDown}
-                                onClick={handleClick}
-                                onDoubleClick={handleDoubleClick}
-                                onWheel={handleWheel}
-                                isDragging={draggingId === item.id}
-                            />
-                        ))}
+                        {items.map(item => {
+                            let fillColor = item.id === 'ball' ? COLORS.ball : '';
+                            if (item.id !== 'ball') {
+                                if (item.team === 'A') fillColor = item.label === 'GK' ? teamColors.AGK : teamColors.A;
+                                else if (item.team === 'B') fillColor = item.label === 'GK' ? teamColors.BGK : teamColors.B;
+                            }
+                            const textColor = item.id !== 'ball' ? getTextColor(fillColor) : '#000000';
+
+                            return (
+                                <Piece
+                                    key={item.id}
+                                    item={{ ...item, color: fillColor, textColor }}
+                                    onPointerDown={handlePointerDown}
+                                    onClick={handleClick}
+                                    onDoubleClick={handleDoubleClick}
+                                    onWheel={handleWheel}
+                                    isDragging={draggingId === item.id}
+                                />
+                            );
+                        })}
                     </svg>
 
                     <EditingPopup
@@ -457,6 +577,8 @@ export default function TacticBoard() {
 
             {/* サイドバー */}
             <div className="w-full lg:w-72 flex flex-col gap-4 mt-8 lg:mt-0">
+                <ColorSettings teamColors={teamColors} setTeamColors={setTeamColors} />
+                
                 <div className="bg-white p-5 rounded-xl shadow-md border border-slate-200">
                     <h2 className="text-lg font-bold mb-4 border-b pb-2 flex items-center justify-between">ハーフ選択</h2>
                     <div className="flex bg-slate-100 p-1 rounded-lg">
@@ -546,8 +668,8 @@ export default function TacticBoard() {
                         </button>
                     </div>
                     <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-6">
-                        <TeamSection title="自チーム (青)" team="A" items={items} onItemChange={handleItemChange} accentColor="blue" />
-                        <TeamSection title="相手チーム (赤)" team="B" items={items} onItemChange={handleItemChange} accentColor="red" />
+                        <TeamSection title="自チーム設定" team="A" items={items} teamColors={teamColors} onItemChange={handleItemChange} accentColor="blue" />
+                        <TeamSection title="相手チーム設定" team="B" items={items} teamColors={teamColors} onItemChange={handleItemChange} accentColor="red" />
                     </div>
                 </div>
             )}
@@ -555,22 +677,24 @@ export default function TacticBoard() {
     );
 }
 
-const TeamSection = memo(({ title, team, items, onItemChange, accentColor }) => {
+const TeamSection = memo(({ title, team, items, teamColors, onItemChange, accentColor }) => {
     const teamItems = items.filter(i => i.team === team);
     const borderColorClass = accentColor === 'blue' ? 'border-blue-500' : 'border-red-500';
     const textColorClass = accentColor === 'blue' ? 'text-blue-700' : 'text-red-700';
-    const bgColorClass = accentColor === 'blue' ? 'bg-blue-500' : 'bg-red-500';
 
     return (
         <div>
             <h3 className={`text-sm font-bold ${textColorClass} border-b-2 ${borderColorClass} mb-3 pb-1`}>{title}</h3>
             <div className="flex flex-col gap-2">
-                {teamItems.map(item => (
-                    <div key={item.id} className="flex items-center gap-2 bg-slate-50 p-2 rounded border border-slate-100">
-                        <div className={`w-6 h-6 rounded-full ${bgColorClass} flex items-center justify-center text-white text-xs font-bold flex-shrink-0`}>
-                            {item.label}
-                        </div>
-                        <input
+                {teamItems.map(item => {
+                    const bgColor = item.label === 'GK' ? teamColors[`${team}GK`] : teamColors[team];
+                    const txtColor = getTextColor(bgColor);
+                    return (
+                        <div key={item.id} className="flex items-center gap-2 bg-slate-50 p-2 rounded border border-slate-100">
+                            <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 border border-slate-300" style={{ backgroundColor: bgColor, color: txtColor }}>
+                                {item.label}
+                            </div>
+                            <input
                             type="text"
                             value={item.label}
                             onChange={(e) => onItemChange(item.id, 'label', e.target.value)}
@@ -585,7 +709,8 @@ const TeamSection = memo(({ title, team, items, onItemChange, accentColor }) => 
                             placeholder="選手名"
                         />
                     </div>
-                ))}
+                );
+            })}
             </div>
         </div>
     );
