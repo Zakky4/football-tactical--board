@@ -192,12 +192,12 @@ const Piece = memo(({ item, onPointerDown, onClick, onDoubleClick, onWheel, isDr
                     <text
                         x="0" y={r + 14}
                         textAnchor="middle"
-                        fill={textColor}
+                        fill="#000000"
                         fontSize="12"
                         fontWeight="600"
                         pointerEvents="none"
                         className="select-none"
-                        style={{ textShadow: textColor === '#FFFFFF' ? '1px 1px 0px rgba(0,0,0,0.8), -1px -1px 0px rgba(0,0,0,0.8), 1px -1px 0px rgba(0,0,0,0.8), -1px 1px 0px rgba(0,0,0,0.8)' : '1px 1px 0px rgba(255,255,255,0.8), -1px -1px 0px rgba(255,255,255,0.8), 1px -1px 0px rgba(255,255,255,0.8), -1px 1px 0px rgba(255,255,255,0.8)' }}
+                        style={{ textShadow: '1px 1px 0px rgba(255,255,255,0.9), -1px -1px 0px rgba(255,255,255,0.9), 1px -1px 0px rgba(255,255,255,0.9), -1px 1px 0px rgba(255,255,255,0.9)' }}
                     >
                         {item.name}
                     </text>
