@@ -742,26 +742,6 @@ export default function TacticBoard() {
 
             {/* サイドバー */}
             <div className="w-full lg:w-72 flex flex-col gap-4 mt-8 lg:mt-0">
-                <ColorSettings teamColors={teamColors} setTeamColors={setTeamColors} />
-                
-                <div className="bg-white p-5 rounded-xl shadow-md border border-slate-200">
-                    <h2 className="text-lg font-bold mb-4 border-b pb-2 flex items-center justify-between">ハーフ選択</h2>
-                    <div className="flex bg-slate-100 p-1 rounded-lg">
-                        <button
-                            onClick={() => isSecondHalf && handleHalfToggle()}
-                            className={`flex-1 py-2 rounded-md font-bold transition-all text-sm ${!isSecondHalf ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                        >
-                            前半
-                        </button>
-                        <button
-                            onClick={() => !isSecondHalf && handleHalfToggle()}
-                            className={`flex-1 py-2 rounded-md font-bold transition-all text-sm ${isSecondHalf ? 'bg-white text-red-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                        >
-                            後半
-                        </button>
-                    </div>
-                </div>
-
                 <div className="bg-white p-5 rounded-xl shadow-md border border-slate-200">
                     <h2 className="text-lg font-bold mb-4 border-b pb-2">ツールモード</h2>
                     <div className="flex gap-2 mb-4">
@@ -797,6 +777,24 @@ export default function TacticBoard() {
                 </div>
 
                 <div className="bg-white p-5 rounded-xl shadow-md border border-slate-200">
+                    <h2 className="text-lg font-bold mb-4 border-b pb-2 flex items-center justify-between">ハーフ選択</h2>
+                    <div className="flex bg-slate-100 p-1 rounded-lg">
+                        <button
+                            onClick={() => isSecondHalf && handleHalfToggle()}
+                            className={`flex-1 py-2 rounded-md font-bold transition-all text-sm ${!isSecondHalf ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                        >
+                            前半
+                        </button>
+                        <button
+                            onClick={() => !isSecondHalf && handleHalfToggle()}
+                            className={`flex-1 py-2 rounded-md font-bold transition-all text-sm ${isSecondHalf ? 'bg-white text-red-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                        >
+                            後半
+                        </button>
+                    </div>
+                </div>
+
+                <div className="bg-white p-5 rounded-xl shadow-md border border-slate-200">
                     <h2 className="text-lg font-bold mb-4 border-b pb-2">戦術メニュー</h2>
                     <div className="flex flex-col gap-3">
                         {tacticMenus.map(menu => (
@@ -818,6 +816,8 @@ export default function TacticBoard() {
                     <Undo2 className="w-5 h-5" />
                     初期配置に戻す (リセット)
                 </button>
+
+                <ColorSettings teamColors={teamColors} setTeamColors={setTeamColors} />
             </div>
 
             {/* 選手リスト編集サイドパネル */}
