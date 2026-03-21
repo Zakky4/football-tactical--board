@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback, memo } from 'react';
-import { Undo2, MousePointer2, Pencil, Trash2, Users, X, Upload, RefreshCw } from 'lucide-react';
+import { Undo2, MousePointer2, Pencil, Trash2, Users, X, Upload, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react';
 
 const SVG_W = 1000;
 const SVG_H = 600;
@@ -256,6 +256,7 @@ const EditingPopup = memo(({ editTarget, editForm, onFormChange, onFormSubmit, o
 
 const ColorSettings = memo(({ teamColors, setTeamColors }) => {
     const [activeTarget, setActiveTarget] = useState('A');
+    const [isOpen, setIsOpen] = useState(false);
 
     const handleColorChange = (key, value) => {
         setTeamColors(prev => ({ ...prev, [key]: value }));
@@ -298,43 +299,53 @@ const ColorSettings = memo(({ teamColors, setTeamColors }) => {
 
     return (
         <div className="bg-white p-5 rounded-xl shadow-md border border-slate-200">
-            <div className="flex justify-between items-center border-b pb-2 mb-4">
-                <h2 className="text-lg font-bold">カラー設定</h2>
-                <a href="https://www.colordic.org/" target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline flex items-center gap-1">
+            <div 
+                className="flex justify-between items-center border-b pb-2 mb-4 cursor-pointer group select-none"
+                onClick={() => setIsOpen(!isOpen)}
+            >
+                <h2 className="text-lg font-bold flex items-center gap-2">
+                    カラー設定
+                    {isOpen ? <ChevronUp className="w-5 h-5 text-slate-400 group-hover:text-slate-600" /> : <ChevronDown className="w-5 h-5 text-slate-400 group-hover:text-slate-600" />}
+                </h2>
+                <a href="https://www.colordic.org/" target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                     カラー参考
                 </a>
             </div>
 
-            <div className="flex flex-col gap-3">
-                <div className="flex flex-col gap-1">
-                    <h3 className="text-xs font-bold text-slate-500 ml-1">自チーム</h3>
-                    <ColorRow label="FP" targetKey="A" />
-                    <ColorRow label="GK" targetKey="AGK" />
-                </div>
-                <div className="flex flex-col gap-1">
-                    <h3 className="text-xs font-bold text-slate-500 ml-1">相手チーム</h3>
-                    <ColorRow label="FP" targetKey="B" />
-                    <ColorRow label="GK" targetKey="BGK" />
-                </div>
-            </div>
+            {isOpen && (
+                <>
+                    <div className="flex flex-col gap-3">
+                        <div className="flex flex-col gap-1">
+                            <h3 className="text-xs font-bold text-slate-500 ml-1">自チーム</h3>
+                            <ColorRow label="FP" targetKey="A" />
+                            <ColorRow label="GK" targetKey="AGK" />
+                        </div>
+                        <div className="flex flex-col gap-1">
+                            <h3 className="text-xs font-bold text-slate-500 ml-1">相手チーム</h3>
+                            <ColorRow label="FP" targetKey="B" />
+                            <ColorRow label="GK" targetKey="BGK" />
+                        </div>
+                    </div>
 
-            <div className="mt-4 pt-4 border-t border-slate-100">
-                <div className="flex justify-between items-end mb-2">
-                    <h3 className="text-xs font-bold text-slate-500">プリセット</h3>
-                    <span className="text-[10px] text-slate-400">選択中: {targets[activeTarget]}</span>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                    {PRESET_COLORS.map(c => (
-                        <button
-                            key={c.label}
-                            onClick={() => applyPreset(c.hex)}
-                            title={c.label}
-                            className="w-6 h-6 rounded-full border border-slate-300 shadow-sm hover:scale-110 transition-transform"
-                            style={{ backgroundColor: c.hex }}
-                        />
-                    ))}
-                </div>
-            </div>
+                    <div className="mt-4 pt-4 border-t border-slate-100">
+                        <div className="flex justify-between items-end mb-2">
+                            <h3 className="text-xs font-bold text-slate-500">プリセット</h3>
+                            <span className="text-[10px] text-slate-400">選択中: {targets[activeTarget]}</span>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                            {PRESET_COLORS.map(c => (
+                                <button
+                                    key={c.label}
+                                    onClick={() => applyPreset(c.hex)}
+                                    title={c.label}
+                                    className="w-6 h-6 rounded-full border border-slate-300 shadow-sm hover:scale-110 transition-transform"
+                                    style={{ backgroundColor: c.hex }}
+                                />
+                            ))}
+                        </div>
+                    </div>
+                </>
+            )}
         </div>
     );
 });
@@ -449,6 +460,7 @@ export default function TacticBoard() {
     const [editForm, setEditForm] = useState({ label: '', name: '' });
     const [showPlayerList, setShowPlayerList] = useState(false);
     const [showImportModal, setShowImportModal] = useState(false);
+    const [isTacticsOpen, setIsTacticsOpen] = useState(false);
 
     const handleImport = useCallback((textA, textB) => {
         const parseText = (text) => {
@@ -795,27 +807,36 @@ export default function TacticBoard() {
                 </div>
 
                 <div className="bg-white p-5 rounded-xl shadow-md border border-slate-200">
-                    <h2 className="text-lg font-bold mb-4 border-b pb-2">戦術メニュー</h2>
-                    <div className="flex flex-col gap-3">
-                        {tacticMenus.map(menu => (
+                    <h2 
+                        className="text-lg font-bold mb-4 border-b pb-2 flex items-center justify-between cursor-pointer group select-none"
+                        onClick={() => setIsTacticsOpen(!isTacticsOpen)}
+                    >
+                        <span>戦術メニュー</span>
+                        {isTacticsOpen ? <ChevronUp className="w-5 h-5 text-slate-400 group-hover:text-slate-600" /> : <ChevronDown className="w-5 h-5 text-slate-400 group-hover:text-slate-600" />}
+                    </h2>
+                    {isTacticsOpen && (
+                        <>
+                            <div className="flex flex-col gap-3">
+                                {tacticMenus.map(menu => (
+                                    <button
+                                        key={menu.id}
+                                        onClick={() => handleTacticClick(menu.id)}
+                                        className="w-full text-left px-4 py-3 bg-slate-100 hover:bg-blue-50 hover:text-blue-700 rounded-lg transition-colors font-semibold"
+                                    >
+                                        {menu.name}
+                                    </button>
+                                ))}
+                            </div>
                             <button
-                                key={menu.id}
-                                onClick={() => handleTacticClick(menu.id)}
-                                className="w-full text-left px-4 py-3 bg-slate-100 hover:bg-blue-50 hover:text-blue-700 rounded-lg transition-colors font-semibold"
+                                onClick={() => handleTacticClick('4-3-3')}
+                                className="mt-4 flex items-center justify-center gap-2 w-full py-3 bg-red-500 hover:bg-red-600 text-white rounded-xl shadow-md transition-colors font-bold"
                             >
-                                {menu.name}
+                                <Undo2 className="w-5 h-5" />
+                                初期配置に戻す (リセット)
                             </button>
-                        ))}
-                    </div>
+                        </>
+                    )}
                 </div>
-
-                <button
-                    onClick={() => handleTacticClick('4-3-3')}
-                    className="flex items-center justify-center gap-2 w-full py-3 bg-red-500 hover:bg-red-600 text-white rounded-xl shadow-md transition-colors font-bold"
-                >
-                    <Undo2 className="w-5 h-5" />
-                    初期配置に戻す (リセット)
-                </button>
 
                 <ColorSettings teamColors={teamColors} setTeamColors={setTeamColors} />
             </div>
