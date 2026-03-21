@@ -697,7 +697,7 @@ export default function TacticBoard() {
     }, [isPenMode]);
 
     return (
-        <div className="flex flex-col lg:flex-row min-h-screen bg-slate-50 text-slate-800 p-4 font-sans max-w-7xl mx-auto">
+        <div className="flex flex-col lg:flex-row lg:gap-8 min-h-screen bg-slate-50 text-slate-800 p-4 font-sans max-w-7xl mx-auto">
             <div className="flex-grow flex flex-col items-center">
                 <h1 className="text-2xl font-bold mb-4 flex items-center gap-2">
                     <SoccerIcon className="w-6 h-6 text-blue-600" />
