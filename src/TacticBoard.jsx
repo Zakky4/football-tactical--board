@@ -697,7 +697,7 @@ export default function TacticBoard() {
             <div className="flex-grow flex flex-col items-center">
                 <h1 className="text-2xl font-bold mb-4 flex items-center gap-2">
                     <MousePointer2 className="w-6 h-6 text-blue-600" />
-                    Tactical Board
+                    Football Tactical Board
                 </h1>
 
                 <div className="w-full max-w-5xl shadow-xl rounded-lg overflow-hidden border-4 border-slate-300 bg-white relative">
