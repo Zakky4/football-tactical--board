@@ -125,6 +125,10 @@ const tacticMenus = [
     { id: '3-5-2', name: '3-5-2 (定位置)' }
 ];
 
+const SoccerIcon = ({ className }) => (
+    <img src="/soccer-icon.png" alt="Soccer Icon" className={className} />
+);
+
 // --- Sub-components ---
 
 const Field = memo(() => (
@@ -696,7 +700,7 @@ export default function TacticBoard() {
         <div className="flex flex-col lg:flex-row min-h-screen bg-slate-50 text-slate-800 p-4 font-sans max-w-7xl mx-auto">
             <div className="flex-grow flex flex-col items-center">
                 <h1 className="text-2xl font-bold mb-4 flex items-center gap-2">
-                    <MousePointer2 className="w-6 h-6 text-blue-600" />
+                    <SoccerIcon className="w-6 h-6 text-blue-600" />
                     Football Tactical Board
                 </h1>
 
