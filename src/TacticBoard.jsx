@@ -992,6 +992,48 @@ export default function TacticBoard() {
                 </div>
 
                 <div className="bg-white p-5 rounded-xl shadow-md border border-slate-200">
+                    <h2 
+                        className="text-lg font-bold mb-4 border-b pb-2 flex items-center justify-between cursor-pointer group select-none"
+                        onClick={() => setIsDataMenuOpen(!isDataMenuOpen)}
+                    >
+                        <span>データ管理</span>
+                        {isDataMenuOpen ? <ChevronUp className="w-5 h-5 text-slate-400 group-hover:text-slate-600" /> : <ChevronDown className="w-5 h-5 text-slate-400 group-hover:text-slate-600" />}
+                    </h2>
+                    {isDataMenuOpen && (
+                        <div className="flex flex-col gap-3">
+                            <button
+                                onClick={handleExportCSV}
+                                className="flex items-center justify-center gap-2 w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors font-bold shadow-sm"
+                            >
+                                <Download className="w-5 h-5" />
+                                CSVで書き出し
+                            </button>
+                            <button
+                                onClick={() => fileInputRef.current?.click()}
+                                className="flex items-center justify-center gap-2 w-full py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-bold shadow-sm"
+                            >
+                                <Upload className="w-5 h-5" />
+                                CSVで読み込み
+                            </button>
+                            <input
+                                type="file"
+                                accept=".csv"
+                                ref={fileInputRef}
+                                style={{ display: 'none' }}
+                                onChange={handleCSVUpload}
+                            />
+                            <button
+                                onClick={handleInitializeBoard}
+                                className="flex items-center justify-center gap-2 w-full py-2 bg-slate-100 hover:bg-red-50 text-red-600 hover:text-red-700 border border-slate-300 hover:border-red-300 rounded-lg transition-colors font-bold"
+                            >
+                                <Trash2 className="w-5 h-5" />
+                                ボードを初期化（全データ削除）
+                            </button>
+                        </div>
+                    )}
+                </div>
+
+                <div className="bg-white p-5 rounded-xl shadow-md border border-slate-200">
                     <h2 className="text-lg font-bold mb-4 border-b pb-2 flex items-center justify-between">ハーフ選択</h2>
                     <div className="flex bg-slate-100 p-1 rounded-lg">
                         <button
@@ -1042,48 +1084,6 @@ export default function TacticBoard() {
                 </div>
 
                 <ColorSettings teamColors={teamColors} setTeamColors={setTeamColors} />
-
-                <div className="bg-white p-5 rounded-xl shadow-md border border-slate-200">
-                    <h2 
-                        className="text-lg font-bold mb-4 border-b pb-2 flex items-center justify-between cursor-pointer group select-none"
-                        onClick={() => setIsDataMenuOpen(!isDataMenuOpen)}
-                    >
-                        <span>データ管理</span>
-                        {isDataMenuOpen ? <ChevronUp className="w-5 h-5 text-slate-400 group-hover:text-slate-600" /> : <ChevronDown className="w-5 h-5 text-slate-400 group-hover:text-slate-600" />}
-                    </h2>
-                    {isDataMenuOpen && (
-                        <div className="flex flex-col gap-3">
-                            <button
-                                onClick={handleExportCSV}
-                                className="flex items-center justify-center gap-2 w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors font-bold shadow-sm"
-                            >
-                                <Download className="w-5 h-5" />
-                                CSVで書き出し
-                            </button>
-                            <button
-                                onClick={() => fileInputRef.current?.click()}
-                                className="flex items-center justify-center gap-2 w-full py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-bold shadow-sm"
-                            >
-                                <Upload className="w-5 h-5" />
-                                CSVで読み込み
-                            </button>
-                            <input
-                                type="file"
-                                accept=".csv"
-                                ref={fileInputRef}
-                                style={{ display: 'none' }}
-                                onChange={handleCSVUpload}
-                            />
-                            <button
-                                onClick={handleInitializeBoard}
-                                className="flex items-center justify-center gap-2 w-full py-2 bg-slate-100 hover:bg-red-50 text-red-600 hover:text-red-700 border border-slate-300 hover:border-red-300 rounded-lg transition-colors font-bold"
-                            >
-                                <Trash2 className="w-5 h-5" />
-                                ボードを初期化（全データ削除）
-                            </button>
-                        </div>
-                    )}
-                </div>
             </div>
 
             {/* 選手リスト編集サイドパネル */}
