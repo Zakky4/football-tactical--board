@@ -482,6 +482,7 @@ export default function TacticBoard() {
     const svgRef = useRef(null);
     const hasMovedRef = useRef(false);
     const isInitialMount = useRef(true);
+    const fileInputRef = useRef(null);
 
     const [isPenMode, setIsPenMode] = useState(false);
     const [lines, setLines] = useState([]);
@@ -792,6 +793,84 @@ export default function TacticBoard() {
         URL.revokeObjectURL(url);
     }, [items, isSecondHalf]);
 
+    const handleCSVUpload = useCallback((e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const parseCSVRow = (row) => {
+            const cols = [];
+            let insideQuote = false;
+            let current = '';
+            for (let i = 0; i < row.length; i++) {
+                const char = row[i];
+                if (char === '"') {
+                    if (insideQuote && row[i + 1] === '"') {
+                        current += '"';
+                        i++;
+                    } else {
+                        insideQuote = !insideQuote;
+                    }
+                } else if (char === ',' && !insideQuote) {
+                    cols.push(current);
+                    current = '';
+                } else {
+                    current += char;
+                }
+            }
+            cols.push(current);
+            return cols;
+        };
+
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            const text = event.target.result;
+            const lines = text.split(/\r?\n/).filter(line => line.trim() !== '');
+            if (lines.length < 2) {
+                alert('CSVデータの形式が正しくありません。');
+                return;
+            }
+
+            const dataRows = lines.slice(1).map(parseCSVRow);
+            
+            setItems(prev => {
+                const next = prev.map(item => ({ ...item }));
+                let homeIndex = 1;
+                let awayIndex = 1;
+
+                dataRows.forEach(cols => {
+                    if (cols.length < 5) return;
+                    const teamSide = cols[0] === 'Home' ? 'A' : cols[0] === 'Away' ? 'B' : null;
+                    if (!teamSide) return;
+
+                    const number = cols[1];
+                    const name = cols[2].replace(/^"|"$/g, '').trim();
+                    const x_pct = parseFloat(cols[3]);
+                    const y_pct = parseFloat(cols[4]);
+                    
+                    if (isNaN(x_pct) || isNaN(y_pct)) return;
+
+                    const teamIndex = teamSide === 'A' ? homeIndex++ : awayIndex++;
+                    if (teamIndex > 11) return;
+
+                    const id = `${teamSide}${teamIndex}`;
+                    const target = next.find(item => item.id === id);
+                    if (target) {
+                        target.label = number;
+                        target.name = name;
+                        target.x = fromPercentage(x_pct, SVG_W);
+                        target.y = fromPercentage(y_pct, SVG_H);
+                    }
+                });
+                return next;
+            });
+
+            if (fileInputRef.current) {
+                fileInputRef.current.value = '';
+            }
+        };
+        reader.readAsText(file);
+    }, []);
+
     const handleInitializeBoard = useCallback(() => {
         if (window.confirm('ボードを初期化し、保存されているデータもすべて削除しますか？')) {
             localStorage.removeItem(STORAGE_KEY);
@@ -981,6 +1060,20 @@ export default function TacticBoard() {
                                 <Download className="w-5 h-5" />
                                 CSVで書き出し
                             </button>
+                            <button
+                                onClick={() => fileInputRef.current?.click()}
+                                className="flex items-center justify-center gap-2 w-full py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-bold shadow-sm"
+                            >
+                                <Upload className="w-5 h-5" />
+                                CSVで読み込み
+                            </button>
+                            <input
+                                type="file"
+                                accept=".csv"
+                                ref={fileInputRef}
+                                style={{ display: 'none' }}
+                                onChange={handleCSVUpload}
+                            />
                             <button
                                 onClick={handleInitializeBoard}
                                 className="flex items-center justify-center gap-2 w-full py-2 bg-slate-100 hover:bg-red-50 text-red-600 hover:text-red-700 border border-slate-300 hover:border-red-300 rounded-lg transition-colors font-bold"
