@@ -1,5 +1,5 @@
-import React, { useState, useRef, useCallback, memo } from 'react';
-import { Undo2, MousePointer2, Pencil, Trash2, Users, X, Upload, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react';
+import React, { useState, useRef, useCallback, memo, useEffect } from 'react';
+import { Undo2, MousePointer2, Pencil, Trash2, Users, X, Upload, RefreshCw, ChevronDown, ChevronUp, Download, Save, CheckCircle2 } from 'lucide-react';
 
 const SVG_W = 1000;
 const SVG_H = 600;
@@ -35,6 +35,21 @@ const PRESET_COLORS = [
     { label: '緑', hex: '#22C55E' },
     { label: 'オレンジ', hex: '#F97316' },
 ];
+
+const STORAGE_KEY = 'football-tactics-data';
+
+const toPercentage = (val, max) => (val / max) * 100;
+const fromPercentage = (pct, max) => (pct / 100) * max;
+
+const loadFromStorage = () => {
+    try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) return JSON.parse(saved);
+    } catch (e) {
+        console.error("Storage load error", e);
+    }
+    return null;
+};
 
 // 初期配置 4-3-3
 const baseItems = [
@@ -440,25 +455,74 @@ const ImportModal = memo(({ isOpen, onClose, onImport }) => {
 // --- Main component ---
 
 export default function TacticBoard() {
-    const [teamColors, setTeamColors] = useState({
-        A: COLORS.teamA,
-        AGK: COLORS.teamAGK,
-        B: COLORS.teamB,
-        BGK: COLORS.teamBGK,
+    const [teamColors, setTeamColors] = useState(() => {
+        const saved = loadFromStorage();
+        return saved?.teamColors || {
+            A: COLORS.teamA,
+            AGK: COLORS.teamAGK,
+            B: COLORS.teamB,
+            BGK: COLORS.teamBGK,
+        };
     });
-    const [items, setItems] = useState(() => baseItems.map(item => ({
-        ...item,
-        angle: item.team === 'A' ? 90 : item.team === 'B' ? -90 : 0
-    })));
+    const [items, setItems] = useState(() => {
+        const saved = loadFromStorage();
+        if (saved?.items) {
+            return saved.items.map(item => ({
+                ...item,
+                x: fromPercentage(item.x_pct, SVG_W),
+                y: fromPercentage(item.y_pct, SVG_H)
+            }));
+        }
+        return baseItems.map(item => ({
+            ...item,
+            angle: item.team === 'A' ? 90 : item.team === 'B' ? -90 : 0
+        }));
+    });
     const [draggingId, setDraggingId] = useState(null);
     const svgRef = useRef(null);
     const hasMovedRef = useRef(false);
+    const isInitialMount = useRef(true);
 
     const [isPenMode, setIsPenMode] = useState(false);
     const [lines, setLines] = useState([]);
     const [currentLine, setCurrentLine] = useState('');
     const [isDrawing, setIsDrawing] = useState(false);
-    const [isSecondHalf, setIsSecondHalf] = useState(false);
+    const [isSecondHalf, setIsSecondHalf] = useState(() => {
+        const saved = loadFromStorage();
+        return saved?.isSecondHalf || false;
+    });
+    const [saveStatus, setSaveStatus] = useState(''); // '' | 'saving' | 'saved'
+
+    useEffect(() => {
+        if (isInitialMount.current) {
+            isInitialMount.current = false;
+            return;
+        }
+        let hideTimeout;
+        const saveTimeout = setTimeout(() => {
+            try {
+                const dataToSave = {
+                    teamColors,
+                    isSecondHalf,
+                    items: items.map(item => ({
+                        ...item,
+                        x_pct: toPercentage(item.x, SVG_W),
+                        y_pct: toPercentage(item.y, SVG_H)
+                    }))
+                };
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(dataToSave));
+                setSaveStatus('saved');
+                hideTimeout = setTimeout(() => setSaveStatus(''), 2000);
+            } catch (e) {
+                console.error("Storage save error", e);
+            }
+        }, 500);
+        setSaveStatus('saving');
+        return () => {
+            clearTimeout(saveTimeout);
+            if (hideTimeout) clearTimeout(hideTimeout);
+        };
+    }, [items, teamColors, isSecondHalf]);
 
     const [editTarget, setEditTarget] = useState(null); // { id, x, y }
     const [editForm, setEditForm] = useState({ label: '', name: '' });
@@ -696,13 +760,68 @@ export default function TacticBoard() {
         ));
     }, [isPenMode]);
 
+    const handleExportCSV = useCallback(() => {
+        const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+        const halfStr = isSecondHalf ? '2ndHalf' : '1stHalf';
+        const filename = `tactics_data_${dateStr}_${halfStr}.csv`;
+
+        const csvHeaders = ['Team (Home/Away)', 'Number', 'Name', 'Position_X(%)', 'Position_Y(%)'];
+        
+        const players = items.filter(item => item.id !== 'ball');
+        
+        const csvRows = players.map(p => {
+            const teamSide = p.team === 'A' ? 'Home' : 'Away';
+            const x_pct = toPercentage(p.x, SVG_W).toFixed(2);
+            const y_pct = toPercentage(p.y, SVG_H).toFixed(2);
+            const name = `"${(p.name || '').replace(/"/g, '""')}"`;
+            return [teamSide, p.label, name, x_pct, y_pct].join(',');
+        });
+
+        const csvContent = [csvHeaders.join(','), ...csvRows].join('\n');
+        const bom = new Uint8Array([0xEF, 0xBB, 0xBF]);
+        const blob = new Blob([bom, csvContent], { type: 'text/csv;charset=utf-8;' });
+        
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', filename);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+    }, [items, isSecondHalf]);
+
+    const handleInitializeBoard = useCallback(() => {
+        if (window.confirm('ボードを初期化し、保存されているデータもすべて削除しますか？')) {
+            localStorage.removeItem(STORAGE_KEY);
+            setTeamColors({
+                A: COLORS.teamA,
+                AGK: COLORS.teamAGK,
+                B: COLORS.teamB,
+                BGK: COLORS.teamBGK,
+            });
+            setIsSecondHalf(false);
+            setItems(baseItems.map(item => ({
+                ...item,
+                angle: item.team === 'A' ? 90 : item.team === 'B' ? -90 : 0
+            })));
+            setSaveStatus('');
+        }
+    }, []);
+
     return (
         <div className="flex flex-col lg:flex-row lg:gap-8 min-h-screen bg-slate-50 text-slate-800 p-4 font-sans max-w-7xl mx-auto">
             <div className="flex-grow flex flex-col items-center">
-                <h1 className="text-2xl font-bold mb-4 flex items-center gap-2">
-                    <SoccerIcon className="w-6 h-6 text-blue-600" />
-                    Football Tactical Board
-                </h1>
+                <div className="flex justify-between items-center mb-4 w-full max-w-5xl">
+                    <h1 className="text-2xl font-bold flex items-center gap-2">
+                        <SoccerIcon className="w-6 h-6 text-blue-600" />
+                        Football Tactical Board
+                    </h1>
+                    <div className="h-6 flex items-center">
+                        {saveStatus === 'saving' && <span className="text-sm text-slate-500 flex items-center gap-1 font-bold"><RefreshCw className="w-4 h-4 animate-spin" /> 保存中...</span>}
+                        {saveStatus === 'saved' && <span className="text-sm text-emerald-600 font-bold flex items-center gap-1"><CheckCircle2 className="w-4 h-4" /> 保存済み</span>}
+                    </div>
+                </div>
 
                 <div className="w-full max-w-5xl shadow-xl rounded-lg overflow-hidden border-4 border-slate-300 bg-white relative">
                     <svg
@@ -843,6 +962,26 @@ export default function TacticBoard() {
                 </div>
 
                 <ColorSettings teamColors={teamColors} setTeamColors={setTeamColors} />
+
+                <div className="bg-white p-5 rounded-xl shadow-md border border-slate-200">
+                    <h2 className="text-lg font-bold mb-4 border-b pb-2 flex items-center justify-between">データ管理</h2>
+                    <div className="flex flex-col gap-3">
+                        <button
+                            onClick={handleExportCSV}
+                            className="flex items-center justify-center gap-2 w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors font-bold shadow-sm"
+                        >
+                            <Download className="w-5 h-5" />
+                            CSVで書き出し
+                        </button>
+                        <button
+                            onClick={handleInitializeBoard}
+                            className="flex items-center justify-center gap-2 w-full py-2 bg-slate-100 hover:bg-red-50 text-red-600 hover:text-red-700 border border-slate-300 hover:border-red-300 rounded-lg transition-colors font-bold"
+                        >
+                            <Trash2 className="w-5 h-5" />
+                            ボードを初期化（全データ削除）
+                        </button>
+                    </div>
+                </div>
             </div>
 
             {/* 選手リスト編集サイドパネル */}
