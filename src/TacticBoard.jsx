@@ -141,7 +141,7 @@ const tacticMenus = [
 ];
 
 const SoccerIcon = ({ className }) => (
-    <img src="/soccer-icon.png" alt="Soccer Icon" className={className} />
+    <img src="/soccer-icon.png" alt="Soccer Icon" className={`${className || ''} mix-blend-multiply`} />
 );
 
 // --- Sub-components ---
