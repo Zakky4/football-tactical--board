@@ -16,53 +16,73 @@ No test, lint, or type-check scripts are configured.
 
 **Stack:** React 19 + Vite 7 + Tailwind CSS 3 + Framer Motion
 
-The app is a single-page soccer/futsal tactical board (Japanese-audience project). Nearly all application logic lives in one file: `src/TacticBoard.jsx` (~1,200 lines). `src/App.jsx` and `src/main.jsx` are minimal wrappers.
+Single-page soccer/futsal tactical board (Japanese-audience project).
 
-### Component structure (all in TacticBoard.jsx)
+### Module structure
 
-- **TacticBoard** — root component; owns all state
-- **Field** — renders the SVG soccer field markings
-- **Piece** — individual player or ball token; handles drag, rotation, editing popup
-- **EditingPopup** — inline form for jersey number / name
-- **ColorSettings** — collapsible color pickers per team
-- **ImportModal** — modal for bulk text/CSV import
+```
+src/
+├── TacticBoard.jsx          # Orchestrator: composes hooks + JSX layout only (~316 lines)
+├── constants/board.js       # SVG dimensions, COLORS, PRESET_COLORS, getTextColor(),
+│                            #   toPercentage/fromPercentage, STORAGE_KEY, loadFromStorage()
+├── data/formations.jsx      # baseItems (22 players+ball), tacticsPositions (6 presets),
+│                            #   tacticMenus, SoccerIcon
+├── hooks/
+│   ├── useItems.js          # Owns: items, teamColors, isSecondHalf, editTarget/editForm state
+│   │                        #   + all mutation handlers (import, clear, reset, tactic, flip)
+│   ├── useInteraction.js    # Owns: draggingId, isPenMode, lines/currentLine state
+│   │                        #   + all pointer/wheel/click handlers; exposes flipLines()
+│   ├── useCSV.js            # handleExportCSV, handleCSVUpload (CSV parse + FileReader)
+│   └── usePersistence.js    # Debounced (500ms) localStorage save; returns saveStatus/setSaveStatus
+└── components/
+    ├── Field.jsx             # SVG field markings (no props)
+    ├── Piece.jsx             # Player/ball token (drag, rotate, label)
+    ├── EditingPopup.jsx      # Inline jersey/name edit form (fixed-position overlay)
+    ├── ColorSettings.jsx     # Collapsible color pickers; owns activeTarget/isOpen state
+    ├── ImportModal.jsx       # Bulk text import modal; owns textA/textB/url state
+    └── TeamSection.jsx       # Sidebar player list with editable inputs
+```
 
-All sub-components are `memo`-wrapped and defined within the same file.
+### State ownership
 
-### State & persistence
+- `useItems` owns `items`, `teamColors`, `isSecondHalf`, `editTarget`, `editForm`
+- `useInteraction` owns `draggingId`, `isPenMode`, `lines`, `currentLine`, `isDrawing`
+- `TacticBoard` owns UI-toggle state only: `showPlayerList`, `showImportModal`, `isTacticsOpen`, `isDataMenuOpen`
+- `usePersistence` watches items/teamColors/isSecondHalf and serializes to `localStorage` key `football-tactics-data`
 
-State is kept in `useState` inside `TacticBoard`. On every state change a 500 ms debounced effect serializes to `localStorage` under the key `football-tactics-data`. On mount, state is rehydrated from that key.
+### Half-flip coordination
 
-Persisted fields: `teamColors`, player `items` (positions stored as percentages of field dimensions), `isSecondHalf`.
+`handleHalfToggle` in `TacticBoard.jsx` composes two hook calls:
+```js
+flipItems();   // from useItems — mirrors x/y, +180° angle, toggles isSecondHalf
+flipLines();   // from useInteraction — mirrors all drawn polyline coordinates
+```
 
 ### Player items schema
 
 ```js
 {
-  id,          // unique string
-  type,        // 'player' | 'ball'
-  team,        // 'A' | 'B'
-  role,        // 'field' | 'goalkeeper'
-  number,      // jersey number string
-  name,        // player name string
-  x, y,        // position as fraction of field width/height
-  angle,       // rotation in degrees
-  color,       // hex color string
+  id,       // 'A1'–'A11', 'B1'–'B11', 'ball'
+  team,     // 'A' | 'B' | 'none'
+  label,    // jersey number string (max 3 chars); 'GK' for goalkeepers
+  name,     // player name string (max 10 chars)
+  x, y,     // pixel position within SVG_W×SVG_H (1000×600)
+  angle,    // rotation in degrees (arrow direction)
+  color,    // hex — overridden at render time from teamColors
+  radius,   // optional; defaults to 18 (ball uses 12)
 }
 ```
 
+Positions are stored as percentages (`x_pct`, `y_pct`) in localStorage and converted back via `fromPercentage()` on load.
+
 ### Key interactions
 
-- **Drag:** pointer events on Piece update `x`/`y` as percentages
-- **Rotate:** scroll wheel on a Piece changes `angle`
-- **Edit:** double-click opens EditingPopup; Enter/blur saves
-- **Half-flip:** mirrors `x` positions (`newX = 1 - x`), inverts angle by 180°, and reverses drawn lines
-- **Formations:** preset functions replace `items` with hardcoded position arrays
+- **Drag:** pointer capture on `Piece`; `useInteraction.handlePointerMove` updates `x`/`y`
+- **Click:** rotates piece +45° (skipped if `hasMovedRef` is true after a drag)
+- **Double-click:** opens `EditingPopup` at screen coordinates via `svg.getScreenCTM()`
+- **Wheel:** ±15° rotation per scroll tick
+- **Pen mode:** draws red polylines; pointer events bypass piece interaction entirely
 
-### Drawing (pen) mode
+### CSV format
 
-Pen mode (`isPenMode`) tracks pointer paths in `lines`/`currentLine`. The UI toggle exists but the feature is partially complete.
-
-### CSV import/export
-
-`handleExportCSV` serialises items to CSV. `handleImportCSV` parses uploaded CSV to update positions and labels. Bulk text import (`handleBulkImport`) parses lines of `"number name"` format.
+Export columns: `Team (Home/Away)`, `Number`, `Name`, `Position_X(%)`, `Position_Y(%)`. BOM-prefixed UTF-8. Import reads the same format and maps rows sequentially to A1–A11 / B1–B11.
