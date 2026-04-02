@@ -14,7 +14,7 @@ No test, lint, or type-check scripts are configured.
 
 ## Architecture
 
-**Stack:** React 19 + Vite 7 + Tailwind CSS 3 + Framer Motion
+**Stack:** React 19 + Vite 7 + Tailwind CSS 3 + Framer Motion + lucide-react (icons)
 
 Single-page soccer/futsal tactical board (Japanese-audience project).
 
@@ -67,7 +67,7 @@ flipLines();   // from useInteraction — mirrors all drawn polyline coordinates
   label,    // jersey number string (max 3 chars); 'GK' for goalkeepers
   name,     // player name string (max 10 chars)
   x, y,     // pixel position within SVG_W×SVG_H (1000×600)
-  angle,    // rotation in degrees (arrow direction)
+  angle,    // rotation in degrees; initial defaults: A=90°(→), B=-90°(←), ball=0°
   color,    // hex — overridden at render time from teamColors
   radius,   // optional; defaults to 18 (ball uses 12)
 }
@@ -78,11 +78,19 @@ Positions are stored as percentages (`x_pct`, `y_pct`) in localStorage and conve
 ### Key interactions
 
 - **Drag:** pointer capture on `Piece`; `useInteraction.handlePointerMove` updates `x`/`y`
-- **Click:** rotates piece +45° (skipped if `hasMovedRef` is true after a drag)
-- **Double-click:** opens `EditingPopup` at screen coordinates via `svg.getScreenCTM()`
-- **Wheel:** ±15° rotation per scroll tick
-- **Pen mode:** draws red polylines; pointer events bypass piece interaction entirely
+- **Click:** rotates piece +45° (skipped if `hasMovedRef` is true after a drag; ball is immune)
+- **Double-click:** opens `EditingPopup` at screen coordinates via `svg.getScreenCTM()` (ball is immune)
+- **Wheel:** ±15° rotation per scroll tick (ball is immune)
+- **Pen mode:** draws red polylines stored as SVG `points` strings; pointer events bypass piece interaction entirely
 
 ### CSV format
 
 Export columns: `Team (Home/Away)`, `Number`, `Name`, `Position_X(%)`, `Position_Y(%)`. BOM-prefixed UTF-8. Import reads the same format and maps rows sequentially to A1–A11 / B1–B11.
+
+### Text bulk import format
+
+`ImportModal` also accepts free-text (one player per line): `<number> [GK] <name>`. Leading digits become the jersey label; if the line contains `GK` (case-insensitive), the player is routed to the GK slot (`A1`/`B1`); remaining players fill field slots in order.
+
+### Formations / tactics
+
+`tacticsPositions` in `formations.jsx` stores **first-half absolute pixel coordinates** for each preset. `handleTacticClick` mirrors x/y automatically when `isSecondHalf` is true, so presets always produce the correct orientation regardless of half.
