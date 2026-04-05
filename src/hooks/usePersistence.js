@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
-import { STORAGE_KEY, toPercentage, SVG_W, SVG_H } from '../constants/board';
+import { getStorageKey, toPercentage, SVG_W, SVG_H } from '../constants/board';
 
-export function usePersistence({ items, teamColors, isSecondHalf }) {
+export function usePersistence({ items, teamColors, isSecondHalf, sportType }) {
     const [saveStatus, setSaveStatus] = useState('');
     const isInitialMount = useRef(true);
 
@@ -22,7 +22,7 @@ export function usePersistence({ items, teamColors, isSecondHalf }) {
                         y_pct: toPercentage(item.y, SVG_H)
                     }))
                 };
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(dataToSave));
+                localStorage.setItem(getStorageKey(sportType), JSON.stringify(dataToSave));
                 setSaveStatus('saved');
                 hideTimeout = setTimeout(() => setSaveStatus(''), 2000);
             } catch (e) {
@@ -34,7 +34,7 @@ export function usePersistence({ items, teamColors, isSecondHalf }) {
             clearTimeout(saveTimeout);
             if (hideTimeout) clearTimeout(hideTimeout);
         };
-    }, [items, teamColors, isSecondHalf]);
+    }, [items, teamColors, isSecondHalf, sportType]);
 
     return { saveStatus, setSaveStatus };
 }

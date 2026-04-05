@@ -1,9 +1,10 @@
 import { useState, useCallback } from 'react';
-import { COLORS, STORAGE_KEY, loadFromStorage, fromPercentage, SVG_W, SVG_H } from '../constants/board';
+import { COLORS, getStorageKey, loadFromStorageByKey, fromPercentage, SVG_W, SVG_H } from '../constants/board';
 import { baseItems, tacticsPositions } from '../data/formations.jsx';
+import { futsalBaseItems, futsalTacticsPositions } from '../data/futsalFormations.js';
 
-function buildInitialItems() {
-    const saved = loadFromStorage();
+function buildInitialItems(sportType) {
+    const saved = loadFromStorageByKey(getStorageKey(sportType));
     if (saved?.items) {
         return saved.items.map(item => ({
             ...item,
@@ -11,14 +12,15 @@ function buildInitialItems() {
             y: fromPercentage(item.y_pct, SVG_H)
         }));
     }
-    return baseItems.map(item => ({
+    const base = sportType === 'futsal' ? futsalBaseItems : baseItems;
+    return base.map(item => ({
         ...item,
         angle: item.team === 'A' ? 90 : item.team === 'B' ? -90 : 0
     }));
 }
 
-function buildInitialTeamColors() {
-    const saved = loadFromStorage();
+function buildInitialTeamColors(sportType) {
+    const saved = loadFromStorageByKey(getStorageKey(sportType));
     return saved?.teamColors || {
         A: COLORS.teamA,
         AGK: COLORS.teamAGK,
@@ -27,17 +29,19 @@ function buildInitialTeamColors() {
     };
 }
 
-function buildInitialIsSecondHalf() {
-    const saved = loadFromStorage();
+function buildInitialIsSecondHalf(sportType) {
+    const saved = loadFromStorageByKey(getStorageKey(sportType));
     return saved?.isSecondHalf || false;
 }
 
-export function useItems({ setShowImportModal }) {
-    const [items, setItems] = useState(buildInitialItems);
-    const [teamColors, setTeamColors] = useState(buildInitialTeamColors);
-    const [isSecondHalf, setIsSecondHalf] = useState(buildInitialIsSecondHalf);
+export function useItems({ setShowImportModal, sportType }) {
+    const [items, setItems] = useState(() => buildInitialItems(sportType));
+    const [teamColors, setTeamColors] = useState(() => buildInitialTeamColors(sportType));
+    const [isSecondHalf, setIsSecondHalf] = useState(() => buildInitialIsSecondHalf(sportType));
     const [editTarget, setEditTarget] = useState(null);
     const [editForm, setEditForm] = useState({ label: '', name: '' });
+
+    const maxPlayers = sportType === 'futsal' ? 5 : 11;
 
     const handleImport = useCallback((textA, textB) => {
         const parseText = (text) => {
@@ -68,7 +72,7 @@ export function useItems({ setShowImportModal }) {
                 const gkPlayer = teamPlayers.find(p => p.id === `${teamKey}1`);
                 const fpPlayers = teamPlayers.filter(p => p.id !== `${teamKey}1`);
                 let fpIndex = 0;
-                parsedPlayers.slice(0, 11).forEach(parsed => {
+                parsedPlayers.slice(0, maxPlayers).forEach(parsed => {
                     if (parsed.isGK && gkPlayer) {
                         gkPlayer.label = parsed.number || 'GK';
                         gkPlayer.name = parsed.name;
@@ -87,7 +91,7 @@ export function useItems({ setShowImportModal }) {
         });
 
         setShowImportModal(false);
-    }, [setShowImportModal]);
+    }, [setShowImportModal, maxPlayers]);
 
     const handleClearNames = useCallback((teamKey) => {
         if (window.confirm('名前をすべてクリアしますか？')) {
@@ -101,7 +105,8 @@ export function useItems({ setShowImportModal }) {
     }, []);
 
     const handleResetNumbers = useCallback((teamKey) => {
-        if (window.confirm('背番号をデフォルト(1〜11)に戻しますか？')) {
+        const range = sportType === 'futsal' ? '1〜5' : '1〜11';
+        if (window.confirm(`背番号をデフォルト(${range})に戻しますか？`)) {
             setItems(prev => prev.map(item => {
                 if (teamKey === 'ALL' || item.team === teamKey) {
                     if (item.id === `${item.team}1`) return { ...item, label: 'GK' };
@@ -111,10 +116,11 @@ export function useItems({ setShowImportModal }) {
                 return item;
             }));
         }
-    }, []);
+    }, [sportType]);
 
     const handleTacticClick = useCallback((tacticKey) => {
-        const config = tacticsPositions[tacticKey];
+        const positions = sportType === 'futsal' ? futsalTacticsPositions : tacticsPositions;
+        const config = positions[tacticKey];
         if (!config) return;
         setItems(prevItems => prevItems.map(item => ({
             ...item,
@@ -122,7 +128,7 @@ export function useItems({ setShowImportModal }) {
             y: isSecondHalf ? SVG_H - (config[item.id]?.y ?? item.y) : config[item.id]?.y ?? item.y,
             angle: isSecondHalf ? (item.team === 'A' ? -90 : item.team === 'B' ? 90 : 0) : (item.team === 'A' ? 90 : item.team === 'B' ? -90 : 0)
         })));
-    }, [isSecondHalf]);
+    }, [isSecondHalf, sportType]);
 
     const flipItems = useCallback(() => {
         setIsSecondHalf(prev => !prev);
@@ -161,20 +167,48 @@ export function useItems({ setShowImportModal }) {
 
     const handleInitializeBoard = useCallback((setSaveStatus) => {
         if (window.confirm('ボードを初期化し、保存されているデータもすべて削除しますか？')) {
-            localStorage.removeItem(STORAGE_KEY);
-            setTeamColors({
+            localStorage.removeItem(getStorageKey(sportType));
+            const defaultColors = {
                 A: COLORS.teamA,
                 AGK: COLORS.teamAGK,
                 B: COLORS.teamB,
                 BGK: COLORS.teamBGK,
-            });
+            };
+            setTeamColors(defaultColors);
             setIsSecondHalf(false);
-            setItems(baseItems.map(item => ({
+            const base = sportType === 'futsal' ? futsalBaseItems : baseItems;
+            setItems(base.map(item => ({
                 ...item,
                 angle: item.team === 'A' ? 90 : item.team === 'B' ? -90 : 0
             })));
             setSaveStatus('');
         }
+    }, [sportType]);
+
+    const handleSportSwitch = useCallback((newSportType) => {
+        const saved = loadFromStorageByKey(getStorageKey(newSportType));
+        const base = newSportType === 'futsal' ? futsalBaseItems : baseItems;
+        const defaultColors = {
+            A: COLORS.teamA,
+            AGK: COLORS.teamAGK,
+            B: COLORS.teamB,
+            BGK: COLORS.teamBGK,
+        };
+
+        if (saved?.items) {
+            setItems(saved.items.map(item => ({
+                ...item,
+                x: fromPercentage(item.x_pct, SVG_W),
+                y: fromPercentage(item.y_pct, SVG_H)
+            })));
+        } else {
+            setItems(base.map(item => ({
+                ...item,
+                angle: item.team === 'A' ? 90 : item.team === 'B' ? -90 : 0
+            })));
+        }
+        setTeamColors(saved?.teamColors || defaultColors);
+        setIsSecondHalf(saved?.isSecondHalf || false);
     }, []);
 
     return {
@@ -196,5 +230,6 @@ export function useItems({ setShowImportModal }) {
         handleEditFormSubmit,
         handleItemChange,
         handleInitializeBoard,
+        handleSportSwitch,
     };
 }

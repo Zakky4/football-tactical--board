@@ -3,12 +3,14 @@ import { Undo2, MousePointer2, Pencil, Trash2, Users, X, Upload, RefreshCw, Chev
 
 import { SVG_W, SVG_H, COLORS, getTextColor } from './constants/board';
 import { SoccerIcon, tacticMenus } from './data/formations.jsx';
+import { futsalTacticMenus, FUTSAL_DEFAULT_TACTIC } from './data/futsalFormations.js';
 import { useItems } from './hooks/useItems';
 import { useInteraction } from './hooks/useInteraction';
 import { useCSV } from './hooks/useCSV';
 import { usePersistence } from './hooks/usePersistence';
 
 import Field from './components/Field';
+import FutsalField from './components/FutsalField';
 import Piece from './components/Piece';
 import EditingPopup from './components/EditingPopup';
 import ColorSettings from './components/ColorSettings';
@@ -23,6 +25,9 @@ export default function TacticBoard() {
     const [showImportModal, setShowImportModal] = useState(false);
     const [isTacticsOpen, setIsTacticsOpen] = useState(false);
     const [isDataMenuOpen, setIsDataMenuOpen] = useState(true);
+    const [sportType, setSportType] = useState(
+        () => localStorage.getItem('tactics-sport-type') || 'soccer'
+    );
 
     const {
         items, setItems,
@@ -39,7 +44,8 @@ export default function TacticBoard() {
         handleEditFormSubmit,
         handleItemChange,
         handleInitializeBoard,
-    } = useItems({ setShowImportModal });
+        handleSportSwitch,
+    } = useItems({ setShowImportModal, sportType });
 
     const {
         draggingId,
@@ -56,9 +62,18 @@ export default function TacticBoard() {
         handleWheel,
     } = useInteraction({ svgRef, items, setItems });
 
-    const { handleExportCSV, handleCSVUpload } = useCSV({ items, setItems, isSecondHalf, fileInputRef });
+    const { handleExportCSV, handleCSVUpload } = useCSV({ items, setItems, isSecondHalf, fileInputRef, sportType });
 
-    const { saveStatus, setSaveStatus } = usePersistence({ items, teamColors, isSecondHalf });
+    const { saveStatus, setSaveStatus } = usePersistence({ items, teamColors, isSecondHalf, sportType });
+
+    const handleSportTypeChange = (newSport) => {
+        if (newSport === sportType) return;
+        setSportType(newSport);
+        localStorage.setItem('tactics-sport-type', newSport);
+        handleSportSwitch(newSport);
+        setLines([]);
+        setIsTacticsOpen(false);
+    };
 
     const handleHalfToggle = () => {
         flipItems();
@@ -73,6 +88,20 @@ export default function TacticBoard() {
                         <SoccerIcon className="w-6 h-6 text-blue-600" />
                         Football Tactical Board
                     </h1>
+                    <div className="flex bg-slate-100 p-1 rounded-lg">
+                        <button
+                            onClick={() => handleSportTypeChange('soccer')}
+                            className={`px-3 py-1.5 rounded-md font-bold text-sm transition-all ${sportType === 'soccer' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                        >
+                            サッカー
+                        </button>
+                        <button
+                            onClick={() => handleSportTypeChange('futsal')}
+                            className={`px-3 py-1.5 rounded-md font-bold text-sm transition-all ${sportType === 'futsal' ? 'bg-white text-orange-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                        >
+                            フットサル
+                        </button>
+                    </div>
                     <div className="h-6 flex items-center">
                         {saveStatus === 'saving' && <span className="text-sm text-slate-500 flex items-center gap-1 font-bold"><RefreshCw className="w-4 h-4 animate-spin" /> 保存中...</span>}
                         {saveStatus === 'saved' && <span className="text-sm text-emerald-600 font-bold flex items-center gap-1"><CheckCircle2 className="w-4 h-4" /> 保存済み</span>}
@@ -89,7 +118,7 @@ export default function TacticBoard() {
                         onPointerUp={handlePointerUp}
                         onPointerLeave={handlePointerUp}
                     >
-                        <Field />
+                        {sportType === 'futsal' ? <FutsalField /> : <Field />}
                         {lines.map((points, index) => (
                             <polyline key={index} points={points} fill="none" stroke="#EF4444" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" pointerEvents="none" />
                         ))}
@@ -236,7 +265,7 @@ export default function TacticBoard() {
                     {isTacticsOpen && (
                         <>
                             <div className="flex flex-col gap-3">
-                                {tacticMenus.map(menu => (
+                                {(sportType === 'futsal' ? futsalTacticMenus : tacticMenus).map(menu => (
                                     <button
                                         key={menu.id}
                                         onClick={() => handleTacticClick(menu.id)}
@@ -247,7 +276,7 @@ export default function TacticBoard() {
                                 ))}
                             </div>
                             <button
-                                onClick={() => handleTacticClick('4-3-3')}
+                                onClick={() => handleTacticClick(sportType === 'futsal' ? FUTSAL_DEFAULT_TACTIC : '4-3-3')}
                                 className="mt-4 flex items-center justify-center gap-2 w-full py-3 bg-red-500 hover:bg-red-600 text-white rounded-xl shadow-md transition-colors font-bold"
                             >
                                 <Undo2 className="w-5 h-5" />

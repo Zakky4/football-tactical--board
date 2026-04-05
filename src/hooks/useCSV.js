@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import { toPercentage, fromPercentage, SVG_W, SVG_H } from '../constants/board';
 
-export function useCSV({ items, setItems, isSecondHalf, fileInputRef }) {
+export function useCSV({ items, setItems, isSecondHalf, fileInputRef, sportType }) {
     const handleExportCSV = useCallback(() => {
         const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
         const halfStr = isSecondHalf ? '2ndHalf' : '1stHalf';
@@ -88,7 +88,7 @@ export function useCSV({ items, setItems, isSecondHalf, fileInputRef }) {
                     if (isNaN(x_pct) || isNaN(y_pct)) return;
 
                     const teamIndex = teamSide === 'A' ? homeIndex++ : awayIndex++;
-                    if (teamIndex > 11) return;
+                    if (teamIndex > (sportType === 'futsal' ? 5 : 11)) return;
 
                     const id = `${teamSide}${teamIndex}`;
                     const target = next.find(item => item.id === id);

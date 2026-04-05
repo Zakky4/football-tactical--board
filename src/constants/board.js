@@ -34,6 +34,11 @@ export const PRESET_COLORS = [
 ];
 
 export const STORAGE_KEY = 'football-tactics-data';
+export const STORAGE_KEY_SOCCER = 'football-tactics-data';
+export const STORAGE_KEY_FUTSAL = 'futsal-tactics-data';
+
+export const getStorageKey = (sportType) =>
+    sportType === 'futsal' ? STORAGE_KEY_FUTSAL : STORAGE_KEY_SOCCER;
 
 export const toPercentage = (val, max) => (val / max) * 100;
 export const fromPercentage = (pct, max) => (pct / 100) * max;
@@ -41,6 +46,16 @@ export const fromPercentage = (pct, max) => (pct / 100) * max;
 export const loadFromStorage = () => {
     try {
         const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) return JSON.parse(saved);
+    } catch (e) {
+        console.error("Storage load error", e);
+    }
+    return null;
+};
+
+export const loadFromStorageByKey = (key) => {
+    try {
+        const saved = localStorage.getItem(key);
         if (saved) return JSON.parse(saved);
     } catch (e) {
         console.error("Storage load error", e);
